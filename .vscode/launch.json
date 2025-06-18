@@ -1,0 +1,57 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File Windows",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder};${workspaceFolder}/src;${workspaceFolder}/utils;${workspaceFolder}/lib;${env:PYTHONPATH}"
+            }
+        },
+        {
+            "name": "Python : Current File With Args Windows" ,
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder};${workspaceFolder}/src;${workspaceFolder}/utils;${workspaceFolder}/lib;${env:PYTHONPATH}"
+            },
+            "args": [
+                "${command:pickArgs}"
+            ]
+        },
+        {
+            "name": "Python: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/src:${workspaceFolder}/utils:${workspaceFolder}/lib:${env:PYTHONPATH}"
+            }
+        },
+        {
+            "name": "Python : Current File With Args",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/src:${workspaceFolder}/utils:${workspaceFolder}/lib:${env:PYTHONPATH}"
+            },
+            "args": [
+                "${command:pickArgs}"
+            ]
+        },
+
+
+    ]
+}
