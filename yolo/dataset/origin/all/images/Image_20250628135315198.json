@@ -1,0 +1,136 @@
+{
+  "version": "3.0.3",
+  "flags": {},
+  "shapes": [
+    {
+      "label": "hole",
+      "score": null,
+      "points": [
+        [
+          921.0000000000002,
+          596.5
+        ],
+        [
+          976.0000000000002,
+          634.0
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "difficult": false,
+      "shape_type": "circle",
+      "flags": {},
+      "attributes": {},
+      "kie_linking": []
+    },
+    {
+      "label": "hole",
+      "score": null,
+      "points": [
+        [
+          798.5000000000002,
+          1076.5
+        ],
+        [
+          861.0000000000002,
+          1109.0
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "difficult": false,
+      "shape_type": "circle",
+      "flags": {},
+      "attributes": {},
+      "kie_linking": []
+    },
+    {
+      "label": "hole",
+      "score": null,
+      "points": [
+        [
+          1143.5000000000002,
+          1426.5
+        ],
+        [
+          1191.0000000000002,
+          1481.5
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "difficult": false,
+      "shape_type": "circle",
+      "flags": {},
+      "attributes": {},
+      "kie_linking": []
+    },
+    {
+      "label": "hole",
+      "score": null,
+      "points": [
+        [
+          1606.0000000000002,
+          1296.5
+        ],
+        [
+          1651.0000000000002,
+          1354.0
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "difficult": false,
+      "shape_type": "circle",
+      "flags": {},
+      "attributes": {},
+      "kie_linking": []
+    },
+    {
+      "label": "hole",
+      "score": null,
+      "points": [
+        [
+          1721.0000000000002,
+          846.5
+        ],
+        [
+          1756.0000000000002,
+          911.5
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "difficult": false,
+      "shape_type": "circle",
+      "flags": {},
+      "attributes": {},
+      "kie_linking": []
+    },
+    {
+      "label": "hole",
+      "score": null,
+      "points": [
+        [
+          1411.0000000000002,
+          456.50000000000006
+        ],
+        [
+          1418.5000000000002,
+          529.0
+        ]
+      ],
+      "group_id": null,
+      "description": "",
+      "difficult": false,
+      "shape_type": "circle",
+      "flags": {},
+      "attributes": {},
+      "kie_linking": []
+    }
+  ],
+  "imagePath": "Image_20250628135315198.jpg",
+  "imageData": null,
+  "imageHeight": 2048,
+  "imageWidth": 3072
+}
