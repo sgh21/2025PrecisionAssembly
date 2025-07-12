@@ -76,6 +76,7 @@ class SegmentResult:
 
     def _filter_edge_point(self, min_distance=5)-> None:
         '''由mask边界过滤canny边界，排除canny边界中离mask边界距离大于阈值的点
+        对于keyhole类(齿轮内轮廓)，额外将bbox纵向2/3以下部分的点删去
         '''
         # print(self.mask_edge_point_o, self.edge_point_i)
         valid_points = []
@@ -83,11 +84,10 @@ class SegmentResult:
             # p_i = p + np.array([self.xyxy_i[1], self.xyxy_i[0]])
             if np.any(np.linalg.norm(self.mask_edge_point_o / self.scale_io - p_i, axis=1) < min_distance):
                 valid_points.append(p_i)
-            # else:
-            #     print(np.min(np.linalg.norm(self.mask_edge_point_o / self.scale_io - p_i, axis=1)), 
-            #           self.mask_edge_point_o[np.argmin(np.linalg.norm(self.mask_edge_point_o / self.scale_io - p_i, axis=1))]/ self.scale_io,
-            #           p_i)
-            # break
+        if self.class_name == "keyhole":
+            # 对于keyhole类，排除bbox纵向2/3以下部分的点
+            y_threshold = self.xyxy_i[1] + (self.xyxy_i[3] - self.xyxy_i[1]) * 2 / 3
+            valid_points = [p for p in valid_points if p[0] < y_threshold]
         self.edge_point_i = np.array(valid_points)
 
     def draw_edge(self, thickness=2, local= True) -> np.ndarray:
