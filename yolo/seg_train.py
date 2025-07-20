@@ -14,7 +14,7 @@ if __name__ == '__main__':
 
     # Train the model
     t1=time.time()
-    results = model.train(data=f"{current_path}\\train.yaml", epochs=200, imgsz=640)
+    results = model.train(data=f"{current_path}\\train.yaml", epochs=200, imgsz=640, workers=4)
     t2=time.time()
 
     print(f"========== Training time: {t2-t1} s ==========")
