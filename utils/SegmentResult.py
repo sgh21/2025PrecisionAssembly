@@ -1,0 +1,119 @@
+import numpy as np
+import cv2
+from scipy.ndimage import binary_erosion
+
+
+class Const:
+    IMG_SHAPE_O = (448, 640, 3)  # YOLO输出图像尺寸
+    GEAR_Z = 18                  # 齿轮的齿数
+    PRESSURE_ANGLE = 20/180*np.pi# 齿轮压力角
+
+class SegmentResult:
+    '''存储一个分割对象的信息的类
+    后缀为i的变量表示拍摄图像的属性，尺寸[2048,3072,3]
+    后缀为o的变量表示模型输出的图像属性，尺寸[448,640,3]
+    后缀为l的变量表示局部坐标系的属性
+    '''
+    class_dict = {
+        0: "gear",      # 齿轮外轮廓
+        1: "hole",      # 安装孔洞
+        2: "keyhole"    # 齿轮内轮廓（齿轮键槽）
+    }
+    def __init__(self, img, class_id, box, mask: np.ndarray):
+        self.position = None    # 位姿，待计算
+        self.radius = None      # 半径，待计算
+        self.angle = None       # 角度，待计算
+        self.img_i = img
+        self.img_o = cv2.resize(img, (640, 448))  # 输出图像尺寸
+        self.class_id = class_id
+        self.class_name = self.class_dict[class_id]
+        self.box_i = box
+        self.mask = mask
+        self.scale_io = Const.IMG_SHAPE_O[0]/img.shape[0]  # scale_io<1，输出图像和输入图像的缩放比例
+        self._cut_pic_with_box(padding = 30)
+        self._calc_bound_with_mask()    # 方法1：yolo输出的mask边界
+        self._calc_bound_with_box()     # 方法2: 用局部图像进行canny得到的边界
+        self._filter_edge_point(min_distance=5)       # 用mask边界过滤canny边界
+    
+    def _calc_bound_with_mask(self)->None:
+        '''使用掩码计算边界点'''
+        kernel = np.array([[0, 1, 0],
+                            [1, 1, 1],
+                            [0, 1, 0]], dtype=bool)
+        eroded_mask = binary_erosion(self.mask, structure=kernel)    # 四边全1的掩码
+
+        edge_mask = self.mask.astype(bool) & ~eroded_mask
+        # print("Edge mask shape:", edge_mask.shape)
+        self.mask_edge_point_o = np.column_stack(np.where(edge_mask))
+    
+    def _cut_pic_with_box(self, padding:int) -> None:
+        '''根据边界框裁剪图片'''
+        x1, y1, x2, y2 = self.box_i.astype(int)
+        height, width= self.img_i.shape[:2]
+        x1 = max(0, x1 - padding)
+        y1 = max(0, y1 - padding)
+        x2 = min(width - 1, x2 + padding)
+        y2 = min(height - 1, y2 + padding)
+        self.xyxy_i = (x1, y1, x2, y2)
+        self.xyxy_o = (int(x1 * self.scale_io), int(y1 * self.scale_io),
+                       int(x2 * self.scale_io), int(y2 * self.scale_io))
+        self.local_img_i = self.img_i[y1:y2, x1:x2]
+    
+    def _calc_bound_with_box(self) -> None:
+        '''在局部图像上使用Canny边缘检测
+        '''
+        gray = cv2.cvtColor(self.local_img_i, cv2.COLOR_BGR2GRAY)
+        gray = cv2.GaussianBlur(gray, (9, 9), 2)
+        # ret, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        v = np.median(gray)
+        if self.class_name == "gear":
+            sigma = 0.1
+        elif self.class_name == "hole":
+            sigma = 0.33
+        elif self.class_name == "keyhole":
+            sigma = 0.5
+        low_threshold = int(max(0, (1.0 - sigma) * v))
+        high_threshold = int(min(255, (1.0 + sigma) * v))
+    
+        edges = cv2.Canny(gray, low_threshold, high_threshold)
+        edge_point = np.column_stack(np.where(edges > 0))
+        self.edge_point_l = edge_point  # 局部坐标系
+        self.edge_point_i = edge_point + np.array([self.xyxy_i[1], self.xyxy_i[0]])  # 转换为原图坐标系
+        self.edge_point_i_raw = self.edge_point_i.copy()  # 保存原始边界点位置
+
+    def _filter_edge_point(self, min_distance=5)-> None:
+        '''由mask边界过滤canny边界，排除canny边界中离mask边界距离大于阈值的点
+        '''
+        # print(self.mask_edge_point_o, self.edge_point_i)
+        valid_points = []
+        for p_i in self.edge_point_i:
+            # p_i = p + np.array([self.xyxy_i[1], self.xyxy_i[0]])
+            if np.any(np.linalg.norm(self.mask_edge_point_o / self.scale_io - p_i, axis=1) < min_distance):
+                valid_points.append(p_i)
+        self.edge_point_i = np.array(valid_points)
+
+    def draw_edge(self,img=None, thickness=2, local=False, raw=False) -> np.ndarray:
+        '''
+        在原图上绘制边界点
+        输出：局部图尺寸/网络输出图尺寸 绘制边界后的图像
+        '''
+        if img is None:
+            img = self.img_o.copy()
+        if local:   # 输出为局部图像尺寸
+            img = self.local_img_i.copy()
+            for point in self.edge_point_l:
+                cv2.circle(img, tuple(point[::-1]), radius=1, color=(0, 255, 0), thickness=thickness)
+            return img
+        else:       # 输出为网络输出图尺寸
+            for p in self.mask_edge_point_o:    # 绘制mask边界
+                cv2.circle(img, tuple(p[::-1]), radius=1, color=(255, 0, 0), thickness=thickness)
+            if raw:
+                list = self.edge_point_i_raw
+            else:
+                list = self.edge_point_i
+            for p in list:         # 绘制canny边界
+                # p_o = (p + np.array([self.xyxy_i[1], self.xyxy_i[0]]))* self.scale_io
+                p_o = p * self.scale_io
+                p_o = p_o.astype(int)
+                cv2.circle(img, tuple(p_o[::-1]), radius=1, color=(0, 255, 0), thickness=thickness)
+            return img

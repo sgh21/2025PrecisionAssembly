@@ -1,126 +1,25 @@
 from ultralytics import YOLO
-from scipy.ndimage import binary_erosion
 import torch
 import numpy as np
 import cv2
+import os
+import sys
 from typing import List, Tuple
+from sklearn.cluster import KMeans
+
+current_path = os.path.dirname(__file__)
+sys.path.append(os.path.dirname(current_path))
+
+from utils.SegmentResult import Const, SegmentResult
+
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-model = YOLO("../yolo/runs/segment/train/weights/best.pt")  # Load a trained model
+model = YOLO("../weights/yolov8-hole.pt")  # Load a trained model
 
-class Const:
-    IMG_SHAPE_O = (448, 640, 3)  # YOLO输出图像尺寸
-    GEAR_Z = 18                  # 齿轮的齿数
-    PRESSURE_ANGLE = 20/180*np.pi# 齿轮压力角
-
-class SegmentResult:
-    '''存储一个分割对象的信息的类
-    后缀为i的变量表示拍摄图像的属性，尺寸[2048,3072,3]
-    后缀为o的变量表示模型输出的图像属性，尺寸[448,640,3]
-    后缀为l的变量表示局部坐标系的属性
-    '''
-    class_dict = {
-        0: "gear",      # 齿轮外轮廓
-        1: "hole",      # 安装孔洞
-        2: "keyhole"    # 齿轮内轮廓（齿轮键槽）
-    }
-    def __init__(self, img, class_id, box, mask: np.ndarray):
-        self.position = None    # 位姿，待计算
-        self.radius = None      # 半径，待计算
-        self.angle = None       # 角度，待计算
-        self.img_i = img
-        self.img_o = cv2.resize(img, (640, 448))  # 输出图像尺寸
-        self.class_id = class_id
-        self.class_name = self.class_dict[class_id]
-        self.box_i = box
-        self.mask = mask
-        self.scale_io = Const.IMG_SHAPE_O[0]/img.shape[0]  # scale_io<1，输出图像和输入图像的缩放比例
-        self._cut_pic_with_box(padding = 30)
-        self._calc_bound_with_mask()    # 方法1：yolo输出的mask边界
-        self._calc_bound_with_box()     # 方法2: 用局部图像进行canny得到的边界
-        self._filter_edge_point()       # 用mask边界过滤canny边界
-    
-    def _calc_bound_with_mask(self)->None:
-        '''使用掩码计算边界点'''
-        kernel = np.array([[0, 1, 0],
-                            [1, 1, 1],
-                            [0, 1, 0]], dtype=bool)
-        eroded_mask = binary_erosion(self.mask, structure=kernel)    # 四边全1的掩码
-
-        edge_mask = self.mask.astype(bool) & ~eroded_mask
-        # print("Edge mask shape:", edge_mask.shape)
-        self.mask_edge_point_o = np.column_stack(np.where(edge_mask))
-    
-    def _cut_pic_with_box(self, padding:int) -> None:
-        '''根据边界框裁剪图片'''
-        x1, y1, x2, y2 = self.box_i.astype(int)
-        height, width= self.img_i.shape[:2]
-        x1 = max(0, x1 - padding)
-        y1 = max(0, y1 - padding)
-        x2 = min(width - 1, x2 + padding)
-        y2 = min(height - 1, y2 + padding)
-        self.xyxy_i = (x1, y1, x2, y2)
-        self.xyxy_o = (int(x1 * self.scale_io), int(y1 * self.scale_io),
-                       int(x2 * self.scale_io), int(y2 * self.scale_io))
-        self.local_img_i = self.img_i[y1:y2, x1:x2]
-    
-    def _calc_bound_with_box(self) -> None:
-        '''在局部图像上使用Canny边缘检测
-        '''
-        gray = cv2.cvtColor(self.local_img_i, cv2.COLOR_BGR2GRAY)
-        gray = cv2.GaussianBlur(gray, (9, 9), 2)
-        # ret, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        v = np.median(gray)
-        if self.class_name == "gear":
-            sigma = 0.1
-        elif self.class_name == "hole":
-            sigma = 0.33
-        elif self.class_name == "keyhole":
-            sigma = 0.5
-        low_threshold = int(max(0, (1.0 - sigma) * v))
-        high_threshold = int(min(255, (1.0 + sigma) * v))
-    
-        edges = cv2.Canny(gray, low_threshold, high_threshold)
-        edge_point = np.column_stack(np.where(edges > 0))
-        self.edge_point_l = edge_point  # 局部坐标系
-        self.edge_point_i = edge_point + np.array([self.xyxy_i[1], self.xyxy_i[0]])  # 转换为原图坐标系
-
-    def _filter_edge_point(self, min_distance=5)-> None:
-        '''由mask边界过滤canny边界，排除canny边界中离mask边界距离大于阈值的点
-        '''
-        # print(self.mask_edge_point_o, self.edge_point_i)
-        valid_points = []
-        for p_i in self.edge_point_i:
-            # p_i = p + np.array([self.xyxy_i[1], self.xyxy_i[0]])
-            if np.any(np.linalg.norm(self.mask_edge_point_o / self.scale_io - p_i, axis=1) < min_distance):
-                valid_points.append(p_i)
-        self.edge_point_i = np.array(valid_points)
-
-    def draw_edge(self,img=None, thickness=2, local=True) -> np.ndarray:
-        '''
-        在原图上绘制边界点
-        输出：局部图尺寸/网络输出图尺寸 绘制边界后的图像
-        '''
-        if img is None:
-            img = self.img_o.copy()
-        if local:   # 输出为局部图像尺寸
-            img = self.local_img_i.copy()
-            for point in self.edge_point_l:
-                cv2.circle(img, tuple(point[::-1]), radius=1, color=(0, 255, 0), thickness=thickness)
-            return img
-        else:       # 输出为网络输出图尺寸
-            for p in self.mask_edge_point_o:    # 绘制mask边界
-                cv2.circle(img, tuple(p[::-1]), radius=1, color=(255, 0, 0), thickness=thickness)
-            for p in self.edge_point_i:         # 绘制canny边界
-                # p_o = (p + np.array([self.xyxy_i[1], self.xyxy_i[0]]))* self.scale_io
-                p_o = p * self.scale_io
-                p_o = p_o.astype(int)
-                cv2.circle(img, tuple(p_o[::-1]), radius=1, color=(0, 255, 0), thickness=thickness)
-            return img
 
 def filter_keyhole_cicle(seg:SegmentResult) -> 'List[List[int,int]]':
     '''对于keyhole类(齿轮内轮廓)，额外将bbox纵向2/3以下部分的点删去
-    TODO：不是所有图像都沿纵向保留2/3，考虑引入角度参数
+    不是所有图像都沿纵向保留2/3，考虑引入角度参数 -> 弃用本函数
     '''
     valid_points = []
     if seg.class_name == "keyhole":
@@ -485,63 +384,6 @@ def calculate_angle_with_involutes(theta, rho, edge_points_relative):
             })
     visualize_involute_fitting(involutes, fitted_involutes, radius_base)
 
-def calculate_gear_angle(gear_pos:Tuple[int,int,float], seg:SegmentResult) -> float:
-    '''计算齿轮的旋转角度   # TODO:实现齿轮角度计算
-    返回：范围 [0, 2*pi/z]
-    '''
-    if seg.class_name != "gear":
-        return None
-    edge_points = seg.edge_point_i
-    cx, cy = gear_pos[:2]  # 齿轮中心位置
-    edge_points_relative = edge_points - np.array([cy, cx])  # 转换为相对坐标系
-    # 对边缘点进行下采样，增大采样点间距，计算齿顶角度均值时能够利用多个齿的齿顶
-    edge_points_relative = fps_downsample_kmeans(edge_points_relative, num_samples=len(edge_points_relative)//10)
-    u, v = edge_points_relative[:, 1], edge_points_relative[:, 0]
-    rho, theta = np.sqrt(u**2+v**2), np.arctan2(v, u)   # 极坐标转换
-    theta = np.mod(theta, 2 * np.pi)                    # 确保角度在 [0, 2*pi] 范围内
-    print(f"theta range: {np.min(theta)} to {np.max(theta)}")
-    print(f"rho range: {np.min(rho)} to {np.max(rho)}")
-    tooth_height = (np.max(rho) - np.min(rho))          # 齿高
-    radius_pitch = (np.max(rho) + np.min(rho)) / 2      # 分度圆半径
-    radius_base = radius_pitch * np.cos(Const.PRESSURE_ANGLE)    # 基圆半径
-    # 按照角度排序
-    sorted_indices = np.argsort(theta)
-    theta = theta[sorted_indices]
-    rho = rho[sorted_indices]
-    edge_points_relative = edge_points_relative[sorted_indices]
-    size = len(theta)    
-    
-    # 方法一：按渐开线切片，按角度顺序，到极大值或极小值时切片，若跨过至少1/2齿高则保留rp-1/4h~rp+1/4h部分的点
-    # calculate_angle_with_involutes(theta, rho, edge_points_relative)
-
-    # 方法二：暴力搜索rho的top-k点的theta，归一化到单齿角度范围后取均值
-    k = 20  # 取前k个rho极值点
-    k = min(size, k)
-    top_k_indices = np.argsort(rho)[-k:]  # 获取rho的top-k点索引
-    top_k_theta = theta[top_k_indices]  # 获取对应的theta值
-    regularized_theta = np.mod(top_k_theta, 2 * np.pi/Const.GEAR_Z)  # 确保角度在 [0, 2*pi/z] 范围内
-    print(f"Regularized theta range: {np.min(regularized_theta)} to {np.max(regularized_theta)}")
-    print(regularized_theta)
-    gear_angle_mean = np.mean(regularized_theta)  # 计算平均角度
-    gear_angle_median = np.median(regularized_theta)  # 计算中位数角度
-    print(f"Mean: {np.mean(regularized_theta)}, Median: {np.median(regularized_theta)}")
-
-    img = seg.img_i.copy()  # 检查齿轮角度计算
-    for p in edge_points_relative:
-        x = int(cx + p[1])
-        y = int(cy + p[0])
-        if 0 <= x < img.shape[1] and 0 <= y < img.shape[0]:
-            img = cv2.circle(img, (x, y), radius=1, color=(255, 0, 0), thickness=5)
-    img = cv2.line (img, (cx, cy), (int(cx + 500 * np.cos(gear_angle_mean)), int(cy + 500 * np.sin(gear_angle_mean))), (0, 255, 255), 10)
-    img = cv2.line (img, (cx, cy), (int(cx + 500 * np.cos(gear_angle_median)), int(cy + 500 * np.sin(gear_angle_median))), (0, 0, 255), 10)
-    img = cv2.resize(img, (Const.IMG_SHAPE_O[1], Const.IMG_SHAPE_O[0]))
-    cv2.imshow("Gear Angle", img)
-
-    return gear_angle_mean
-
-from sklearn.cluster import KMeans
-import numpy as np
-
 def fps_downsample_kmeans(points, num_samples):
     """
     使用KMeans聚类实现类似FPS的效果
@@ -556,6 +398,116 @@ def fps_downsample_kmeans(points, num_samples):
     
     # 返回聚类中心
     return kmeans.cluster_centers_
+
+def remove_outliers_mad(data, threshold=2.0):
+    """
+    使用中位数绝对偏差(MAD)方法去除离群值
+    更robust，不受极端值影响
+    """
+    if len(data) < 3:
+        return data
+    
+    median = np.median(data)
+    mad = np.median(np.abs(data - median))
+    
+    if mad == 0:
+        return data
+    
+    modified_z_scores = 0.6745 * (data - median) / mad
+    mask = np.abs(modified_z_scores) < threshold
+    return mask
+
+
+def calculate_gear_angle(gear_pos:Tuple[int,int,float], seg:SegmentResult) -> float:
+    '''计算齿轮的旋转角度
+    返回：范围 [0, 2*pi/z]
+    '''
+    if seg.class_name != "gear":
+        return None
+    mask_edge = True  # 是否使用mask边界点
+    if mask_edge:
+        edge_points = seg.mask_edge_point_o/seg.scale_io
+    else:
+        edge_points = seg.edge_point_i
+    cx, cy = gear_pos[:2]  # 齿轮中心位置
+    edge_points_relative = edge_points - np.array([cy, cx])  # 转换为相对坐标系
+    # 对边缘点进行下采样，增大采样点间距，计算齿顶角度均值时能够利用多个齿的齿顶
+    # edge_points_relative = fps_downsample_kmeans(edge_points_relative, num_samples=len(edge_points_relative)//10)
+    u, v = edge_points_relative[:, 1], edge_points_relative[:, 0]
+    rho, theta = np.sqrt(u**2+v**2), np.arctan2(v, u)   # 极坐标转换
+    theta = np.mod(theta, 2 * np.pi)                    # 确保角度在 [0, 2*pi] 范围内
+    # print(f"theta range: {np.min(theta)} to {np.max(theta)}")
+    # print(f"rho range: {np.min(rho)} to {np.max(rho)}")
+    tooth_height = (np.max(rho) - np.min(rho))          # 齿高
+    radius_pitch = (np.max(rho) + np.min(rho)) / 2      # 分度圆半径
+    radius_base = radius_pitch * np.cos(Const.PRESSURE_ANGLE)    # 基圆半径
+    # 按照角度排序
+    sorted_indices = np.argsort(theta)
+    theta = theta[sorted_indices]
+    rho = rho[sorted_indices]
+    edge_points_relative = edge_points_relative[sorted_indices]
+    size = len(theta)    
+    
+    # 方法一：按渐开线切片，按角度顺序，到极大值或极小值时切片，若跨过至少1/2齿高则保留rp-1/4h~rp+1/4h部分的点
+    # calculate_angle_with_involutes(theta, rho, edge_points_relative)  # 切片效果不佳
+
+    # 方法二：暴力搜索rho的top-k点的theta，归一化到单齿角度范围后取均值 # TODO：考虑使用pitch上的边界点，先聚为两类分别取均值，再对两个角度取均值（无偏）
+    # 找到最大rho所在theta
+    tooth_range = 2 * np.pi / Const.GEAR_Z  # 单齿角度范围
+    theta_peek = np.mod(theta[np.argmax(rho)]+1/2*tooth_range, tooth_range)  # 最大rho对应的theta
+    # 根据齿轮齿数，将theta切分成z个部分
+    theta_split = []
+    rho_split = []
+    for i in range(Const.GEAR_Z):
+        start_angle = (theta_peek + i * tooth_range) % (2 * np.pi)
+        end_angle = (theta_peek + (i + 1) * tooth_range) % (2 * np.pi)
+        if start_angle < end_angle:
+            mask = (theta >= start_angle) & (theta < end_angle)
+        else:# 处理跨越0度的情况
+            mask = (theta >= start_angle) | (theta < end_angle)
+        # 提取该区间内的点
+        theta_split.append(theta[mask])
+        rho_split.append(rho[mask])
+    
+    top_rho_theta = []  # 存储每个区间的top-k theta
+    top_rho_edge_points = []  # 存储每个区间的top-k边缘点
+    k = 1  # 每个区间取前k个rho极值点
+    for theta, rho in zip(theta_split, rho_split):
+        k = min(len(theta), k)
+        if k == 0:
+            continue
+        top_k_indices = np.argsort(rho)[-k:]  # 获取rho的top-k点索引
+        top_rho_theta.append(theta[top_k_indices])  # 获取对应的theta值
+        for idx in top_k_indices:
+            cx, cy = gear_pos[:2]
+            # 获取对应的边缘点
+            r = rho[idx]
+            t = theta[idx]
+            point = [int(cy + r * np.sin(t)), int(cx + r * np.cos(t))]
+            top_rho_edge_points.append(point)
+
+    regularized_theta = np.mod(np.array(top_rho_theta).flatten(), tooth_range)  # 确保角度在 [0, 2*pi/z] 范围内
+    mask = remove_outliers_mad(regularized_theta, threshold=2.0)  # 使用MAD方法去除离群值
+    regularized_theta = regularized_theta[mask]  # 过滤离群值
+    # print(f"Regularized theta range: {np.min(regularized_theta)} to {np.max(regularized_theta)}")
+    # print(regularized_theta)
+    gear_angle_mean = np.mean(regularized_theta)  # 计算平均角度
+    gear_angle_median = np.median(regularized_theta)  # 计算中位数角度
+    # print(f"Mean: {gear_angle_mean}, Median: {gear_angle_median}")
+
+    # img = seg.img_i.copy()  # 检查齿轮角度计算
+    # for p in edge_points_relative:
+    #     x = int(cx + p[1])
+    #     y = int(cy + p[0])
+    #     if 0 <= x < img.shape[1] and 0 <= y < img.shape[0]:
+    #         img = cv2.circle(img, (x, y), radius=1, color=(255, 0, 0), thickness=5)
+    # img = cv2.line (img, (cx, cy), (int(cx + 500 * np.cos(gear_angle_mean)), int(cy + 500 * np.sin(gear_angle_mean))), (0, 255, 255), 10)
+    # img = cv2.line (img, (cx, cy), (int(cx + 500 * np.cos(gear_angle_median)), int(cy + 500 * np.sin(gear_angle_median))), (0, 0, 255), 10)
+    # img = cv2.resize(img, (Const.IMG_SHAPE_O[1], Const.IMG_SHAPE_O[0]))
+    # cv2.imshow("Gear Angle", img)
+
+    return gear_angle_mean, top_rho_edge_points
+
 
 
 def locate_all_segment(seg_list:List[SegmentResult], img=None, debug=False) -> Tuple[Tuple[int,int,float],List[Tuple[int,int,float]],float]:
@@ -575,50 +527,67 @@ def locate_all_segment(seg_list:List[SegmentResult], img=None, debug=False) -> T
         elif seg.class_name == "keyhole":
             keyhole_list.append(seg)
             
-    # 1. 计算齿轮的位置
+    '''1. 计算齿轮的位置'''
     if len(keyhole_list) != 1:
         print(f"WARNING: Keyhole Detection Failed. Detected Number:{len(keyhole_list)}")
     for seg in keyhole_list:
-        filtered_points = filter_keyhole_cicle(seg)
-        cx, cy, r = locate_circle(filtered_points)
+        # edge_points = filter_keyhole_cicle(seg)
+        edge_points = seg.edge_point_i    # 使用边缘点（不过滤），直接进行圆拟合
+        cx, cy, r = locate_circle(edge_points)
 
         # if debug and img is not None: # 绘制keyhole边界
-        #     for p in filtered_points:
+        #     for p in edge_points:
         #         img = cv2.circle(img, tuple(p[::-1]), radius=1, color=(0, 255, 0), thickness=2)
-        #     print(f"filtered keyhole points: {len(filtered_points)}")
+        #     print(f"filtered keyhole points: {len(edge_points)}")
+        #     img = cv2.circle(img, (int(cx), int(cy)), radius=int(r), color=(0, 255, 0), thickness=2)
         #     img = cv2.resize(img, (Const.IMG_SHAPE_O[1], Const.IMG_SHAPE_O[0]))
         #     cv2.imshow("Keyhole Circle", img)
         #     cv2.waitKey(0)
         if cx is not None and cy is not None and r is not None:
             gear_pos= (int(cx), int(cy),r)
-    # # 使用霍夫圆变换更精确地定位齿轮位置 -> 效果不佳
-    # for seg in keyhole_list:
-    #     limg = seg.local_img_i.copy()
-    #     gray = cv2.cvtColor(limg, cv2.COLOR_BGR2GRAY)
-    #     gray = cv2.GaussianBlur(gray, (9, 9), 2)
-    #     circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1, minDist=10,
-    #                                param1=100, param2=50, minRadius=50, maxRadius=300)
-    #     if circles is not None:
-    #         for circle in circles[0, :]:
-    #             cx, cy, r = circle
-    #             ci = np.array([seg.xyxy_i[1], seg.xyxy_i[0]])+np.array([cx, cy])  # 转换为原图坐标系
-    #             if np.linalg.norm(ci - np.array([gear_pos[1],gear_pos[0]])) > 10:  # 限制在齿轮位置附近
-    #                 continue
-    #             if debug:
-    #                 limg = cv2.circle(limg, (int(cx), int(cy)), radius=int(r), color=(0, 255, 0), thickness=2)
-    #                 print(f"Detected circle: center=({cx}, {cy}), radius={r}") 
-    #         if limg is not None and debug:
-    #             cv2.imshow("Hough Circle Detection", limg)
-    #             cv2.waitKey(0)
     
-    # 2. 计算齿轮的角度
+    # # 使用霍夫圆变换更精确地定位齿轮位置
+    for seg in keyhole_list:
+        limg = seg.local_img_i.copy()
+        gray = cv2.cvtColor(limg, cv2.COLOR_BGR2GRAY)
+        gray = cv2.GaussianBlur(gray, (5, 5), 2)
+        circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, dp=1, minDist=20,
+                                   param1=100, param2=30, minRadius=50, maxRadius=200)
+        print(f"Detected circles: {len(circles[0]) if circles is not None else 0}")
+        if circles is not None:
+            error = []
+            for circle in circles[0, :]:
+                cx, cy, r = circle
+                ci = np.array([seg.xyxy_i[1], seg.xyxy_i[0]])+np.array([cx, cy])  # 转换为原图坐标系
+                if np.linalg.norm(ci - np.array(gear_pos[:2])) > 30:
+                    error.append(1e6)  # 距离过远，认为是错误检测
+                    continue
+                error.append(10*np.linalg.norm(ci - np.array(gear_pos[:2]))+abs(r+10 - gear_pos[2]))
+                if debug:
+                    limg = cv2.circle(limg, (int(cx), int(cy)), radius=int(r), color=(0, 255, 0), thickness=2)
+                    print(f"Detected circle: center=({cx}, {cy}), radius={r}") 
+            best_circle = circles[0, np.argmin(error)]
+            gear_pos = (int(seg.xyxy_i[0] + best_circle[0]), int(seg.xyxy_i[1] + best_circle[1]), best_circle[2])
+
+            # if limg is not None and debug:
+            #     cv2.circle(limg, (int(best_circle[0]), int(best_circle[1])), radius=int(best_circle[2]), color=(255, 255, 0), thickness=3)
+            #     cv2.imshow("Hough Circle Detection", limg)
+            #     cv2.waitKey(0)
+    
+    '''2. 计算齿轮的角度'''
     if len(gear_list) != 1:
         print(f"WARNING: Gear Detection Failed. Detected Number:{len(gear_list)}")
     for seg in gear_list:
         filter_gear_circle(gear_pos, seg)  # 过滤掉齿轮内轮廓点
-        gear_angle = calculate_gear_angle(gear_pos, seg)
-        pass # TODO: 计算齿轮的角度
-    # 3. 计算孔洞的位置
+        gear_angle, top_rho_points = calculate_gear_angle(gear_pos, seg)
+    if debug and img is not None:
+        for p in top_rho_points:
+            img = cv2.circle(img, tuple(p[::-1]), radius=5, color=(255, 0, 0), thickness=8)
+        # img = cv2.resize(img, (Const.IMG_SHAPE_O[1], Const.IMG_SHAPE_O[0]))
+        # cv2.imshow("Gear Angle Detection", img)
+        # cv2.waitKey(0)
+    
+    '''3. 计算孔洞的位置'''
     if len(hole_list) != 6:
         print(f"Warning: Hole Detection Failed. Detected Number:{len(hole_list)}")
     radius_list = []
@@ -635,11 +604,20 @@ def locate_all_segment(seg_list:List[SegmentResult], img=None, debug=False) -> T
         hole_pos_list = [hole_pos_list[i] for i in min_index]
     return gear_pos, hole_pos_list, gear_angle
     
-def main():
-    img = cv2.imread("img1.jpg")    
+def detect_img(img:np.ndarray, model, show=False) -> 'Tuple[Tuple[int,int,float],List[Tuple[int,int,float]],float]':
+    '''
+    处理单张图像，返回齿轮、孔洞位置和齿轮角度的检测结果
+    > 参数：
+    img: 输入图像，numpy数组格式
+    show: 是否显示检测结果图像
+    > 返回值:
+    gear_pos: 齿轮位置和半径 (cx, cy, radius)
+    hole_pos_list: 孔洞位置列表 [(cx, cy, radius), ...]
+    gear_angle: 齿轮的旋转角度，范围 [0, 2*pi/z]
+    '''
     # 裁剪使得两方向缩放比例相同
     img = img[:img.shape[0],:int(img.shape[0]*Const.IMG_SHAPE_O[1]/Const.IMG_SHAPE_O[0])]
-    print(f"Image shape: {img.shape}")
+    # print(f"Image shape: {img.shape}")
     # 使用YOLO模型进行预测
     results = model.predict(img)
     boxes = results[0].boxes.xyxy.cpu().numpy()
@@ -653,28 +631,46 @@ def main():
             box = boxes[i],
             mask = masks[i]
         ))
-    print(f"Detected {len(seg_list)} segments.")
+    # print(f"Detected {len(seg_list)} segments.")
 
-    show_img = img.copy()
     # 绘制位置检测结果
-    gear_pos, hole_pos_list, gear_angle = locate_all_segment(seg_list, img=show_img, debug=False)
-    show_img = cv2.circle(show_img, gear_pos[:2], radius=5, color=(0, 0, 255), thickness=5)
-    show_img = cv2.circle(show_img, gear_pos[:2], radius=int(gear_pos[2]), color=(0, 0, 255), thickness=5)
-    for hole_pos in hole_pos_list:
-        show_img = cv2.circle(show_img, hole_pos[:2], radius=5, color=(0, 0, 255), thickness=5)
-        show_img = cv2.circle(show_img, hole_pos[:2], radius=int(hole_pos[2]), color=(0, 0, 255), thickness=5)
-    # 绘制角度检测效果
-    show_img = cv2.line (show_img, gear_pos[:2], (int(gear_pos[0] + 500 * np.cos(gear_angle)), int(gear_pos[1] + 500 * np.sin(gear_angle))), (0, 255, 255), 8)
-    show_img = cv2.resize(show_img, (Const.IMG_SHAPE_O[1], Const.IMG_SHAPE_O[0]))
-    # 绘制边缘提取结果
-    for seg in seg_list:
-        if seg.class_name == "keyhole":
+    show_img = img.copy()
+
+    gear_pos, hole_pos_list, gear_angle = locate_all_segment(seg_list, img=show_img, debug=True)
+    # print(f"Gear Position: {gear_pos}, Holes: {hole_pos_list}, Gear Angle: {gear_angle:.2f} rad")
+    if show:
+        show_img = cv2.circle(show_img, gear_pos[:2], radius=5, color=(0, 0, 255), thickness=5)
+        show_img = cv2.circle(show_img, gear_pos[:2], radius=int(gear_pos[2]), color=(0, 0, 255), thickness=5)
+        for hole_pos in hole_pos_list:
+            show_img = cv2.circle(show_img, hole_pos[:2], radius=5, color=(0, 0, 255), thickness=5)
+            show_img = cv2.circle(show_img, hole_pos[:2], radius=int(hole_pos[2]), color=(0, 0, 255), thickness=5)
+        # 绘制角度检测效果
+        cv2.line (show_img, gear_pos[:2], (int(gear_pos[0] + 500 * np.cos(gear_angle)), int(gear_pos[1] + 500 * np.sin(gear_angle))), (0, 255, 255), 8)
+        cv2.putText(show_img, f"Angle:{gear_angle*180/np.pi:.1f}deg", (gear_pos[0]+300, gear_pos[1]),
+                cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 0), 3)
+        show_img = cv2.resize(show_img, (Const.IMG_SHAPE_O[1], Const.IMG_SHAPE_O[0]))
+        # # 绘制边缘提取结果
+        # for seg in seg_list:
+        #     if seg.class_name == "keyhole":
+        #         continue
+        #     x1, y1, x2, y2 = seg.xyxy_i
+        #     print(f"{seg.class_name} bbox: ({x1}, {y1}), ({x2}, {y2})")
+        #     show_img = seg.draw_edge(img=show_img, thickness=1, local=False, raw=False)
+        return gear_pos, hole_pos_list, gear_angle, show_img
+
+    return gear_pos, hole_pos_list, gear_angle
+
+def main():
+
+    imgdir_path = os.path.join(current_path, "imgset")
+    for file in os.listdir(imgdir_path):
+        if not file.endswith(".jpg"):
             continue
-        x1, y1, x2, y2 = seg.xyxy_i
-        print(f"{seg.class_name} bbox: ({x1}, {y1}), ({x2}, {y2})")
-        show_img = seg.draw_edge(img=show_img, thickness=1, local=False)
-    cv2.imshow("Segmented Image", show_img)
-    cv2.waitKey(0)
+        img = cv2.imread(os.path.join(imgdir_path,file))    
+        gear_pos, hole_pos_list, gear_angle, img = detect_img(img, model, show=True)
+        cv2.imshow(f"Detection Result - {file}", img)
+        cv2.waitKey(0)
+        break
 
 if __name__ == "__main__":
     main()
