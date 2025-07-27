@@ -272,12 +272,25 @@ if __name__ == '__main__':
     # dests=[{"pos":[-0.5,0.1,0.4],"ori":[-180/R2D,20/R2D,-80/R2D]},]
     # controller.move_target(dest[0]['pos'],dest[0]['ori'])
 
+    ini_point = controller.robot.get_current_waypoint()
+    print(f"current pose:{ini_point['pos']},{ini_point['ori']}")
+    
+    time.sleep(5)
+
+    relative_dests=[{"pos":[-0.1,0.1,0],"ori":[-10/R2D,0,0]}]
+    controller.move_relative_target(relative_dests[0]['pos'],relative_dests[0]['ori'])
+    
+    time.sleep(5)
     point = controller.robot.get_current_waypoint()
     print(f"current pose:{point['pos']},{point['ori']}")
+
+    ini_ori = quaternion_to_rpy(ini_point['ori'])
+    controller.move_target(ini_point['pos'],ini_ori)
     
-    # relative_dests=[{"pos":[-0.1,0.1,0],"ori":[-10/R2D,0,0]}]
-    # controller.move_relative_target(relative_dests[0]['pos'],relative_dests[0]['ori'])
-    
+    time.sleep(5)
+    point = controller.robot.get_current_waypoint()
+    print(f"current pose:{point['pos']},{point['ori']}")
+
     controller.disconnect()
 
 

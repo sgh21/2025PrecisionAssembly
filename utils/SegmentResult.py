@@ -7,6 +7,9 @@ class Const:
     IMG_SHAPE_O = (448, 640, 3)  # YOLO输出图像尺寸
     GEAR_Z = 18                  # 齿轮的齿数
     PRESSURE_ANGLE = 20/180*np.pi# 齿轮压力角
+    ERROR_GEAR_POS = (0,0)
+    ERROR_GEAR_ANGLE = -1
+
 
 class SegmentResult:
     '''存储一个分割对象的信息的类

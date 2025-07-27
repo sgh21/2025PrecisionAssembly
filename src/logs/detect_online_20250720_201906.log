@@ -1,0 +1,7 @@
+2025-07-20 20:19:07,734 - INFO - robot.rshd=0
+2025-07-20 20:19:07,735 - INFO - ip=192.168.70.100, port=8899
+2025-07-20 20:19:08,654 - INFO - connected to server192.168.70.100:8899 successed.
+2025-07-20 20:19:29,345 - INFO - Starting rotation anti-clockwise...
+2025-07-20 20:19:29,345 - INFO - Gear Angle: 10.64, Robot Angle: -90.00
+2025-07-20 20:22:07,116 - INFO - Starting rotation anti-clockwise...
+2025-07-20 20:22:07,117 - INFO - Gear Angle: 3.11, Robot Angle: -97.47
