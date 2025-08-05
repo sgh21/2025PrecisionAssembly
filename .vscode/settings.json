@@ -1,0 +1,24 @@
+{
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}",
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/utils",
+        "${workspaceFolder}/configs",
+        "${workspaceFolder}/models",
+        "${workspaceFolder}/lib",
+    ],
+    "python.autoComplete.extraPaths": [
+        "${workspaceFolder}",
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/utils",
+        "${workspaceFolder}/configs",
+        "${workspaceFolder}/models",
+        "${workspaceFolder}/lib",
+    ],
+    "terminal.integrated.env.linux": {
+        "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/src:${workspaceFolder}/utils:${workspaceFolder}/lib:${workspaceFolder}/configs"
+    },
+    "terminal.integrated.env.windows": {
+        "PYTHONPATH": "${workspaceFolder};${workspaceFolder}/src;${workspaceFolder}/utils;${workspaceFolder}/lib;${workspaceFolder}/configs"
+    },
+}
