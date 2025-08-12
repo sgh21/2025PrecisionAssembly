@@ -71,7 +71,7 @@ class Const:
     class Yolo:
         MODEL_DIE = r'./models'
         YOLO_CIRCLE_WEIGHTS = 'yolov8-circle.pt'
-        YOLO_HOLE_WEIGHTS = 'yolov8-0803.pt'
+        YOLO_HOLE_WEIGHTS = 'yolov11-seg-0803.pt'
         YOLO_CONF = 0.8  # YOLO检测置信度阈值
 
     class Data:

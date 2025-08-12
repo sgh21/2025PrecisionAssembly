@@ -52,7 +52,7 @@ class VisionServer:
         try:
             self.mvs_handle = MVSController()
             # *： 实例化图片处理类
-            self.img_processor = ImageProcessor(model_weights=YOLO_WEIGHTS, show=False, waitkey=WAITKEY)
+            self.img_processor = ImageProcessor(model_weights=YOLO_WEIGHTS, show=show, waitkey=WAITKEY)
 
             return True
         except Exception as e:
@@ -274,7 +274,7 @@ def main():
     # 创建 VisionServer 实例 
     # * :确定是否使用相机
     vision_server = VisionServer(host = VISION_HOST, port = VISION_PORT, show=True)
-    if(not vision_server.init_camera()):
+    if(not vision_server.init_camera(show=False)):
         raise Exception("Camera init failed")
 
     # 等待客户端连接,阻塞，开始热身
