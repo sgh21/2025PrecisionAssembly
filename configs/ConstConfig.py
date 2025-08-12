@@ -15,7 +15,7 @@ class Const:
         CALIB_POS = [-0.457865, -0.075589, 0.345734]  # 校准位置 [x, y, z] 单位: m
         CALIB_ORI = [PI, 0, -PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
         # -0.1148   -0.001547 -0.11437  -0.0015649 
-        HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.259] # 手眼标定位置 [x, y, z] 单位: m
+        HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.20] # 手眼标定位置 [x, y, z] 单位: m
         JOINT_MAX_ACC = [0.1] * 6
         JOINT_MAX_VELC = [0.1] * 6
         END_MAX_ACC = 0.1
@@ -71,7 +71,8 @@ class Const:
     class Yolo:
         MODEL_DIE = r'./models'
         YOLO_CIRCLE_WEIGHTS = 'yolov8-circle.pt'
-        YOLO_HOLE_WEIGHTS = 'yolov11-seg-0803.pt'
+        # YOLO_HOLE_WEIGHTS = 'yolov11-seg-0803.pt'
+        YOLO_HOLE_WEIGHTS = 'yolov8-0803.pt'
         YOLO_CONF = 0.8  # YOLO检测置信度阈值
 
     class Data:

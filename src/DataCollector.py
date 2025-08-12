@@ -17,7 +17,7 @@ INIT_ORI = copy.deepcopy(Const.Robot.INIT_ORI)          # 初始姿态 [roll, pi
 POS_RANGE = [0.05, 0.05, 0.0]                     # 每个方向最大扰动范围 ±m
 ORI_RANGE = [0, 0, 10]                            # 姿态扰动范围 ±deg
 NUM_SAMPLES = 100                                  # 采集数量
-DATASET_DIR = r'./documents/dataset/0803/images'  # 保存路径
+DATASET_DIR = r'./documents/dataset/0812/images'  # 保存路径
 
 os.makedirs(DATASET_DIR, exist_ok=True)
 
@@ -57,7 +57,7 @@ def main():
     aubo.movel(INIT_POS, INIT_ORI, joint=True)  # 移动到初始位置
 
     for idx in range(NUM_SAMPLES):
-        idx += 100
+        idx += 200
         # 生成随机位姿
         pos, ori = random_pose_around(INIT_POS, INIT_ORI, POS_RANGE, ORI_RANGE)
         print(f"[{idx+1}/{NUM_SAMPLES}] 移动到位置: {pos}, 姿态: {ori}")

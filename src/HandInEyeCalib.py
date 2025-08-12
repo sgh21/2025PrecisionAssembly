@@ -101,7 +101,7 @@ def hand_in_eye_calibration():
         if img is None:
             print("未获取到图像")
             continue
-        gear_pos, gear_angle = img_processor.dectect_gear(
+        gear_pos, gear_angle, _ = img_processor.detect_gear(
             img,
             circle_fit_method='EdgeDrawing',
         )
