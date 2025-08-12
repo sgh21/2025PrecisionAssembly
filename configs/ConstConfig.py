@@ -20,6 +20,10 @@ class Const:
         JOINT_MAX_VELC = [0.1] * 6
         END_MAX_ACC = 0.1
         END_MAX_VELC = 0.1
+        JOINT_STABLE_ACC = [0.1] * 6
+        JOINT_STABLE_VELC = [0.1] * 6
+        END_STABLE_ACC = 0.1
+        END_STABLE_VELC = 0.1
         JOINT_INSERT_ACC = [0.03] * 6  # 插入时的关节最大加速度
         JOINT_INSERT_VELC = [0.03] * 6
         END_INSERT_ACC = 0.03  # 插入时的末端最大加速度
@@ -38,6 +42,9 @@ class Const:
 
     class Vision:
         """视觉相关配置"""
+        HOST = 'localhost'
+        PORT = 2025
+        
         CUT_PADDING = 30  # 裁剪图片时的padding
         GEAR_SIGMA = 0.1  # 齿轮检测高斯滤波sigma
         HOLE_SIGMA = 0.33
@@ -92,8 +99,9 @@ class Const:
     class Task:
         """任务相关配置"""
         TARGET_HOLE_IDX = 2
-        TARGET_HOLE_IDX_LIST = [0, 1, 2, 3, 4, 5]  # 目标孔索引列表
+        TARGET_HOLE_IDX_LIST = [3, 4, 5]  # 目标孔索引列表
         TIME_SLEEP = 1.0  # 等待机械臂稳定的时间
+        WAITKEY = 30  # OpenCV窗口等待时间
 
 class SegmentResult:
     '''存储一个分割对象的信息的类

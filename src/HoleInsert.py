@@ -31,6 +31,7 @@ INTRINSIC_A = Const.Camera.INTRINSIC_A
 HAND_IN_EYE_OFFSET = Const.Robot.HAND_IN_EYE_OFFSET
 
 TIME_SLEEP =  Const.Task.TIME_SLEEP  # 等待机械臂稳定的时间
+TARGET_HOLE_IDX = Const.Task.TARGET_HOLE_IDX
 
 def main():
     # 初始化机器人和相机
@@ -59,11 +60,11 @@ def main():
             print("未获取到图像")
             continue
         
-        hole_list = img_processor.detect_hole(
+        hole_list, _ = img_processor.detect_hole(
             img,
             circle_fit_method='EdgeDrawing',
         )
-        idx = Const.Task.TARGET_HOLE_IDX
+        idx = TARGET_HOLE_IDX
         assert hole_list[idx][2] is not None, "Target circle not found"
         u, v, r = hole_list[idx]
         print(f"圆心: ({u:.3f}, {v:.3f}), 半径: {r:.3f}")

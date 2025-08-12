@@ -30,7 +30,7 @@ INTRINSIC_U0 = Const.Camera.INTRINSIC_U0
 INTRINSIC_A = Const.Camera.INTRINSIC_A
 
 TIME_SLEEP = Const.Task.TIME_SLEEP  # 等待机械臂稳定的时间
-
+TARGET_HOLE_IDX = Const.Task.TARGET_HOLE_IDX
 
 def hand_in_eye_calibration():
     # 初始化机器人和相机
@@ -65,11 +65,11 @@ def hand_in_eye_calibration():
         if img is None:
             print("未获取到图像")
             continue
-        hole_list = img_processor.detect_hole(
+        hole_list, _ = img_processor.detect_hole(
             img,
             circle_fit_method='EdgeDrawing',
         )
-        idx = Const.Task.TARGET_HOLE_IDX
+        idx = TARGET_HOLE_IDX
         assert hole_list[idx][2] is not None, "Target circle not found"
         u, v, r = hole_list[idx]
         

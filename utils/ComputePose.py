@@ -109,8 +109,6 @@ def EdgeDrawingMethod(gray_img, return_all = False):
 
 
 class LocateHole:
-    def __init__(self, show: bool = False):
-        self.show = show
     
     def fliter_boxes_by_class(self, 
                               seg_list:List[SegmentResult], 
@@ -337,7 +335,7 @@ class LocateHole:
                     circle = self.filter_hole_by_radius(seg.xyxy_i, circles, radius=Const.Vision.HOLE_RADIUS)
                     hole_list.append(circle)
         # 显示结果 
-        if self.show and show_img is not None:
+        if show_img is not None:
             for i, (cx, cy, r) in enumerate(hole_list):
                 r = r if r is not None else 80
                 cv2.circle(show_img, (int(cx), int(cy)), int(r), (0, 255, 0), 2)
@@ -382,7 +380,7 @@ class LocateHole:
         else:
             circle = self.filter_hole_by_radius(calib_seg.xyxy_i, circles, radius=Const.Vision.HOLE_RADIUS)
 
-        if self.show and show_img is not None:
+        if show_img is not None:
             if circle[0] is not None and circle[1] is not None:
                 cv2.circle(show_img, (int(circle[0]), int(circle[1])), int(circle[2]), (0, 0, 255), 2)
                 cv2.putText(show_img, "Calib Hole", (int(circle[0]), int(circle[1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
@@ -390,8 +388,6 @@ class LocateHole:
         return circle
     
 class LocateGear:
-    def __init__(self, show: bool = False):
-        self.show = show
 
     def filter_gear_circle(self, 
                            gear_pos:'Tuple[int,int,float]', 
@@ -483,7 +479,7 @@ class LocateGear:
             theta_mark_left = []  # 左半齿的标记点角度
             theta_mark_right = []
 
-            if show_img is not None and self.show:
+            if show_img is not None :
                 for i, r in enumerate(rho_left):
                     error = np.abs(r - radius_mark)
                     if min(error) > 20:
@@ -584,14 +580,7 @@ class LocateGear:
                 # 计算误差：距离齿轮位置的距离 + 半径误差
                 # 这里的10是一个权重系数，可以根据实际情况调整
                 error.append(10*np.linalg.norm(ci - np.array(gear_pos[:2]))+abs(r+10 - gear_pos[2]))
-                if self.show :
-                    limg = cv2.circle(limg, (int(cx), int(cy)), radius=int(r), color=(0, 255, 0), thickness=2)
-                    cv2.putText(limg, f"({int(cx)}, {int(cy)})", (int(cx), int(cy)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
-                    # *： 如果希望显示keyhole检测结果可以打开
-                    # cv2.imshow("Circle Detection", limg)
-                    # if cv2.waitKey(0) & 0xFF == 'q' :
-                    #     cv2.destroyAllWindows()
-                    print(f"Detected circle: center=({cx}, {cy}), radius={r}") 
+
             best_circle = circles[np.argmin(error)]
             gear_pos = (int(keyhole_seg.xyxy_i[0] + best_circle[0]), int(keyhole_seg.xyxy_i[1] + best_circle[1]), best_circle[2])
         
@@ -602,7 +591,7 @@ class LocateGear:
         gear_seg = gear_list[0]
         self.filter_gear_circle(gear_pos, gear_seg)  # 过滤掉齿轮内轮廓点
         gear_angle = self.calculate_gear_angle_waist(gear_pos, gear_seg, show_img = show_img)
-        if self.show and show_img is not None:
+        if  show_img is not None:
             # 显示齿轮位置和角度
             cx, cy, r = int(gear_pos[0]), int(gear_pos[1]), int(gear_pos[2])
             cv2.circle(show_img, (int(cx), int(cy)), radius=int(r), color=(0, 0, 255), thickness=2)
@@ -618,8 +607,8 @@ class ImageProcessor:
         self.model = YOLO(model_weights)
         self.show = show
         self.waitkey = waitkey
-        self.gear_locator = LocateGear(show=show)
-        self.hole_locator = LocateHole(show=show)
+        self.gear_locator = LocateGear()
+        self.hole_locator = LocateHole()
         
     def yolo_predict(self, img: np.ndarray) -> List[SegmentResult]:
         results = self.model.predict(img, retina_masks = True, conf = Const.Yolo.YOLO_CONF)
@@ -633,6 +622,7 @@ class ImageProcessor:
             cv2.resizeWindow("YOLO Result", Const.Camera.IMG_SHAPE_SHOW[1], Const.Camera.IMG_SHAPE_SHOW[0])  # 你想要的尺寸
             cv2.imshow("YOLO Result", img_show)
             cv2.waitKey(self.waitkey)  # 等待按键事件，0表示无限等待
+
         boxes = results[0].boxes.xyxy.cpu().numpy()
         masks = results[0].masks.data.cpu().numpy()
         classes = results[0].boxes.cls.cpu().numpy().astype(int)
@@ -657,7 +647,7 @@ class ImageProcessor:
         cv2.imshow("Detection Result", show_img)
         cv2.waitKey(waitkey)  # 等待按键事件，0表示无限等待
     
-    def process_image(self, img: np.ndarray, circle_fit_method: str = 'EdgeDrawing') -> Tuple[Tuple[int, int, float], List[Tuple[int, int, float]], float]:
+    def process_image(self, img: np.ndarray, circle_fit_method: str = 'EdgeDrawing') -> Tuple[Tuple[int, int, float], List[Tuple[int, int, float]], float, Tuple[float, float, float]]:
         '''
         处理单张图像，返回齿轮、孔洞位置和齿轮角度的检测结果
         > 参数：
@@ -670,28 +660,49 @@ class ImageProcessor:
         gear_angle: 齿轮的旋转角度，范围 [0, 2*pi/z]
         calib_hole: 标定孔洞位置和半径 (cx, cy, radius)
         '''
-        show_img = deepcopy(img) if self.show else None
+        show_img = deepcopy(img) 
         # 进行YOLO检测
         seg_list = self.yolo_predict(img)
         assert len(seg_list) > 0, "No valid segment results found"
-        # 处理齿轮检测
-        gear_pos, gear_angle = self.gear_locator.locate_gear(seg_list=seg_list, show_img = show_img, circle_fit_method=circle_fit_method) if self.gear_locator else (Const.Gear.ERROR_POS, Const.Gear.ERROR_ANGLE)
-        # 处理孔洞检测
-        hole_list = self.hole_locator.locate_hole(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.hole_locator else []
-        # 处理标定孔洞检测
-        calib_hole = self.hole_locator.locate_calib_circle(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.hole_locator else (None, None, None)
-        
-        if self.show and show_img is not None:
-           self._show_img(show_img, waitkey=self.waitkey)
 
-        return gear_pos, hole_list, gear_angle, calib_hole  # 返回齿轮位置和角度 (cx, cy, radius), angle, 孔洞位置列表 [(cx, cy, radius), ...], 标定孔洞位置和半径 (cx, cy, radius)
+        # 处理齿轮检测
+        try:
+            gear_pos, gear_angle = self.gear_locator.locate_gear(
+                seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method
+            ) if self.gear_locator else (Const.Gear.ERROR_POS, Const.Gear.ERROR_ANGLE)
+        except Exception as e:
+            print(f"\033[31m[ERROR] Gear locating failed: {e}\033[0m")
+            gear_pos, gear_angle = Const.Gear.ERROR_POS, Const.Gear.ERROR_ANGLE
+
+        # 处理孔洞检测
+        try:
+            hole_list = self.hole_locator.locate_hole(
+                seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method
+            ) if self.hole_locator else []
+        except Exception as e:
+            print(f"\033[31m[ERROR] Hole locating failed: {e}\033[0m")
+            hole_list = []
+
+        # 处理标定孔洞检测
+        try:
+            calib_hole = self.hole_locator.locate_calib_circle(
+                seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method
+            ) if self.hole_locator else (None, None, None)
+        except Exception as e:
+            print(f"\033[31m[ERROR] Calib hole locating failed: {e}\033[0m")
+            calib_hole = (None, None, None)
+
+        if self.show and show_img is not None:
+            self._show_img(show_img, waitkey=self.waitkey)
+
+        return gear_pos, hole_list, gear_angle, calib_hole, show_img  # 返回齿轮位置和角度、孔洞列表、标定孔洞
     
-    def dectect_gear(self,
+    def detect_gear(self,
                     img: np.ndarray,
                     circle_fit_method: str = 'EdgeDrawing') -> Tuple[Tuple[int, int, float], float]:
         """ 检测齿轮位置和角度 """
 
-        show_img = deepcopy(img) if self.show else None
+        show_img = deepcopy(img) 
         seg_list = self.yolo_predict(img)
         assert len(seg_list) > 0, "No valid segment results found"
         # 处理齿轮检测
@@ -699,13 +710,13 @@ class ImageProcessor:
         if self.show and show_img is not None:
             self._show_img(show_img, waitkey=self.waitkey)
 
-        return gear_pos, gear_angle  # 返回齿轮位置和角度 (cx, cy, radius), angle
+        return gear_pos, gear_angle, show_img  # 返回齿轮位置和角度 (cx, cy, radius), angle
     
     def detect_hole(self, 
                     img: np.ndarray, 
                     circle_fit_method: str = 'EdgeDrawing') -> List[Tuple[int, int, float]]:
         
-        show_img = deepcopy(img) if self.show else None
+        show_img = deepcopy(img) 
         seg_list = self.yolo_predict(img)
         assert len(seg_list) > 0, "No valid segment results found"
         # 处理孔洞检测
@@ -714,13 +725,13 @@ class ImageProcessor:
         if self.show and show_img is not None:
             self._show_img(show_img, waitkey=self.waitkey)
 
-        return hole_list
+        return hole_list, show_img
     
     def detect_calib_hole(self, 
                           img: np.ndarray, 
                           circle_fit_method: str = 'EdgeDrawing') -> Tuple[float, float, float]:
         
-        show_img = deepcopy(img) if self.show else None
+        show_img = deepcopy(img) 
         # 进行YOLO检测
         seg_list = self.yolo_predict(img)
         assert len(seg_list) > 0, "No valid segment results found"
@@ -730,7 +741,7 @@ class ImageProcessor:
         if self.show and show_img is not None:
             self._show_img(show_img, waitkey=self.waitkey)
         
-        return calib_hole  # 返回圆心坐标和半径 (cx, cy, radius)
+        return calib_hole, show_img  # 返回圆心坐标和半径 (cx, cy, radius)
 
 def test_circle_stability(num_samples=100, interval=0.2):
     """
@@ -760,7 +771,7 @@ def test_circle_stability(num_samples=100, interval=0.2):
                 time.sleep(interval)
                 continue
 
-            gear_pos, gear_angle = image_processor.dectect_gear(img, circle_fit_method='EdgeDrawing')
+            gear_pos, gear_angle, show_img = image_processor.detect_gear(img, circle_fit_method='EdgeDrawing')
             result = gear_pos 
             if result:
                 x, y, r = result

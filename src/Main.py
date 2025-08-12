@@ -30,6 +30,7 @@ HAND_IN_EYE_OFFSET = Const.Robot.HAND_IN_EYE_OFFSET
 CONTROLLER_INIT_ANGLE = Const.Robot.CONTROLLER_INIT_ANGLE  
 
 TIME_SLEEP = Const.Task.TIME_SLEEP  # 等待机械臂稳定的时间
+TARGET_HOLE_IDX_LIST = Const.Task.TARGET_HOLE_IDX_LIST  # 目标圆孔索引
 
 # TODO: 对代码逻辑，尤其是标定时各个方向坐标系变换进行测试
 # TODO： 对圆孔识别算法进行进一步优化，测试精度问题的主要诱因 
@@ -54,7 +55,7 @@ def move_and_detect(
             continue
             
         if object == 'hole':
-            hole_list = img_processor.detect_hole(
+            hole_list, _ = img_processor.detect_hole(
                 img,
                 circle_fit_method='EdgeDrawing',
             )
@@ -63,7 +64,7 @@ def move_and_detect(
             u, v, r = hole_list[target_hole_idx]
 
         elif object == 'gear':
-            gear_pos, gear_angle = img_processor.dectect_gear(
+            gear_pos, gear_angle, _ = img_processor.detect_gear(
                 img,
                 circle_fit_method='EdgeDrawing',
             )
@@ -222,7 +223,7 @@ def main():
         aubo, 
         mvs, 
         img_processor,
-        target_hole_idx=[0,1,2,3,4,5]  # 假设有三个目标圆孔
+        target_hole_idx=TARGET_HOLE_IDX_LIST  # 假设有三个目标圆孔
     )
     # 安全点插补
     target_insert_pos_list, target_insert_ori_list = interpolation_of_safety_points(

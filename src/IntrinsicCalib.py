@@ -71,7 +71,7 @@ def main():
             img = mvs.get_image(debug=True)
             if img is not None:
                 # 检测圆心像素坐标
-                circle = img_processor.detect_calib_hole(img, circle_fit_method='EdgeDrawing')
+                circle, _ = img_processor.detect_calib_hole(img, circle_fit_method='EdgeDrawing')
                 if circle is not None:
                     u, v, r = circle
                     print(f"检测到圆心像素: ({u:.2f}, {v:.2f})")
