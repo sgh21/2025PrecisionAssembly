@@ -15,7 +15,8 @@ class Const:
         CALIB_POS = [-0.457865, -0.075589, 0.345734]  # 校准位置 [x, y, z] 单位: m
         CALIB_ORI = [PI, 0, -PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
         # -0.1148   -0.001547 -0.11437  -0.0015649 
-        HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.20] # 手眼标定位置 [x, y, z] 单位: m
+        HAND_IN_EYE_OFFSET = [-0.114635, -0.00163165, -0.259]
+        # HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.20] # 手眼标定位置 [x, y, z] 单位: m
         JOINT_MAX_ACC = [0.1] * 6
         JOINT_MAX_VELC = [0.1] * 6
         END_MAX_ACC = 0.1
@@ -30,14 +31,15 @@ class Const:
         END_INSERT_VELC = 0.03
         X_OFFSET = 0.11  # 相机X轴偏移量（米） -2.0147132317361707
         POSE_ERROR_THRESHOLD = 3 * 1e-5  # 位置误差阈值（米） 0.03mm
-        CONTROLLER_INIT_ANGLE = 0.8728294 / 180 * PI  # 控制器初始角度，单位：deg
+        # CONTROLLER_INIT_ANGLE = 0.8728294 / 180 * PI  # 控制器初始角度，单位：deg
+        CONTROLLER_INIT_ANGLE = 0.74431351 / 180 * PI
 
     class Camera:
         IMG_SHAPE_SHOW = (1024, 1536, 3)
-        # INTRINSIC_A = [[0.0088, -9.7801],  # 0.3732 px 0.3794 px
-        #                [-9.7911,  0.0495]]
-        INTRINSIC_A = [[0.0081, -9.8759],  # 0.3726 px 0.3540 px
-                       [-9.8850,  0.0567]]
+        INTRINSIC_A = [[0.0091, -9.8750],  # 0.3984 px 0.4146 px
+                       [-9.8831,  0.0568]]
+        # INTRINSIC_A = [[0.0081, -9.8759],  # 0.3726 px 0.3540 px
+        #                [-9.8850,  0.0567]]
         INTRINSIC_U0 = [1536, 1024]
 
     class Vision:
@@ -99,7 +101,7 @@ class Const:
         ]
     class Task:
         """任务相关配置"""
-        TARGET_HOLE_IDX = 2
+        TARGET_HOLE_IDX = 3
         TARGET_HOLE_IDX_LIST = [3, 4, 5]  # 目标孔索引列表
         TIME_SLEEP = 1.0  # 等待机械臂稳定的时间
         WAITKEY = 30  # OpenCV窗口等待时间
