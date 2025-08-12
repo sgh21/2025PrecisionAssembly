@@ -153,7 +153,7 @@ if __name__ == "__main__":
         pass_gear = input("是否跳过齿轮角度检测？(y/n): ").strip().lower()
         pass_gear = True if pass_gear == 'y' else False
 
-        hand_in_eye_calibration()
+        hand_in_eye_calibration(pass_gear=pass_gear)
     except Exception as e:
         print(f"发生错误: {e}")
     finally:
