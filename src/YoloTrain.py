@@ -7,7 +7,7 @@ data_dir =Const.Data.DATASET_DIR
 
 if __name__ == "__main__":
     # Load a model
-    model = YOLO("yolov8n-seg.yaml").load(weights='yolov8n-seg.pt')  # build a new model from scratch
+    model = YOLO("yolo11s-seg.yaml").load(weights='./models/yolov11s-seg-0803.pt')  # build a new model from scratch
     # model = YOLO("yolov8n-seg.pt")  # load a pretrained model (recommended for training)
 
     # 设置数据增强参数
@@ -30,9 +30,9 @@ if __name__ == "__main__":
    
     # Use the model
     model.train(
-        data=f"{data_dir}/yolo_0803/config.yaml", 
+        data=f"{data_dir}/yolo_0812/config.yaml", 
         epochs=100,
-        batch = 32,
+        batch = 16,
         workers = 12,
         **data_augmentation_params)  # train the model
     

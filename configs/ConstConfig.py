@@ -73,7 +73,7 @@ class Const:
     class Yolo:
         MODEL_DIE = r'./models'
         YOLO_CIRCLE_WEIGHTS = 'yolov8-circle.pt'
-        YOLO_HOLE_WEIGHTS = 'yolov11-seg-0803.pt'
+        YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0812.pt'
         # YOLO_HOLE_WEIGHTS = 'yolov8-0803.pt'
         YOLO_CONF = 0.8  # YOLO检测置信度阈值
 
@@ -85,7 +85,7 @@ class Const:
         GEAR_CLASS = 'gear'
         HOLE_CLASS = 'hole'
         KEYHOLE_CLASS = 'keyhole'
-        CALIB_CLASS = 'calib_hole'
+        CALIB_CLASS = 'calib_circle'
 
         CLASS_DICT = {
             KEYHOLE_CLASS: 0,

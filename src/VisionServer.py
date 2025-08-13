@@ -157,7 +157,7 @@ class VisionServer:
                     t4 = cv2.getTickCount()
 
                     # 序列化数
-                    result = {'status': 'success', 'result': [u, v, r]}
+                    result = {'status': 'success', 'result': [float(u), float(v), float(r)]}
                     data_to_send = pickle.dumps(result)
                     # 发送数据长度
                     client_socket.sendall(len(data_to_send).to_bytes(4, byteorder='big'))
@@ -191,7 +191,7 @@ class VisionServer:
                     t4 = cv2.getTickCount()
 
                     # 序列化数
-                    result = {'status': 'success', 'result': [gear_pos, gear_angle]}
+                    result = {'status': 'success', 'result': [gear_pos, float(gear_angle)]}
                     data_to_send = pickle.dumps(result)
                     # 发送数据长度
                     client_socket.sendall(len(data_to_send).to_bytes(4, byteorder='big'))
