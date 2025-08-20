@@ -2,103 +2,130 @@ import os
 import cv2
 import time
 from copy import deepcopy
-from AuboControlLowLevel import AuboController
-from MVSControl import MVSController
 from ConstConfig import Const
-from ComputePose import ImageProcessor
+from RobotClientV2 import RobotClient
 from Transform import *
 
 """
 根据Target Hole Index进行插孔，用于辅助手眼标定，将机器人移动到大概位置
 需要注意的是，插孔时为了防止碰撞，请将安装板上的齿轮去除，防止碰撞
 """
+#!/usr/bin/env python3
+import time
+from copy import deepcopy
+from RobotClientV2 import RobotClient
+from ConstConfig import Const
+
+"""
+基于RobotClient的插孔程序，用于辅助手眼标定
+将机器人移动到指定孔位的大概位置
+注意：插孔时请将安装板上的齿轮去除，防止碰撞
+"""
+
 # ====== 配置参数 ======
-ROBOT_IP = Const.Robot.IP
-ROBOT_PORT = Const.Robot.PORT
-X_OFFSET = Const.Robot.X_OFFSET  # 相机X轴偏移量（米）
-POS_ERROR_THRESHOLD = Const.Robot.POSE_ERROR_THRESHOLD  # 位置误差阈值（米） 0.03mm
-JOINT_MAX_ACC = Const.Robot.JOINT_MAX_ACC
-JOINT_MAX_VELC = Const.Robot.JOINT_MAX_VELC
-END_MAX_ACC = Const.Robot.END_MAX_ACC
-END_MAX_VELC = Const.Robot.END_MAX_VELC
+TIME_SLEEP = Const.Task.TIME_SLEEP
+TARGET_HOLE_IDX = Const.Task.TARGET_HOLE_IDX
 ROBOT_INIT_POS = Const.Robot.INIT_POS
 ROBOT_INIT_ORI = Const.Robot.INIT_ORI
-YOLO_WEIGHTS = os.path.join(Const.Yolo.MODEL_DIE, 
-                            Const.Yolo.YOLO_HOLE_WEIGHTS)
-
-INTRINSIC_U0 = Const.Camera.INTRINSIC_U0
-INTRINSIC_A = Const.Camera.INTRINSIC_A
 HAND_IN_EYE_OFFSET = Const.Robot.HAND_IN_EYE_OFFSET
 
-TIME_SLEEP =  Const.Task.TIME_SLEEP  # 等待机械臂稳定的时间
-TARGET_HOLE_IDX = Const.Task.TARGET_HOLE_IDX
+DZ = Const.Robot.DZ  # 插入时的Z轴偏移量
+# CLASS INFO
+HOLE = Const.ClassInfo.HOLE_CLASS
+
+class HoleInsertClient(RobotClient):
+    """继承RobotClient，专门用于插孔操作"""
+    
+    def __init__(self):
+        super().__init__()
+        print("插孔客户端初始化完成")
+    
+    def move_to_hole_position(self, target_hole_idx: int = TARGET_HOLE_IDX):
+        """移动机械臂到指定圆孔位置"""
+        print(f"开始移动到目标圆孔索引: {target_hole_idx}")
+        
+        # 检查视觉服务器连接
+        if self.client_socket is None:
+            print("视觉服务器未连接，无法执行插孔操作")
+            return False
+        
+        try:
+            # 移动到初始位置
+            init_pos = deepcopy(ROBOT_INIT_POS)
+            init_ori = deepcopy(ROBOT_INIT_ORI)
+            self.set_robot_mode('stable')
+            self.aubo.movel(init_pos, init_ori, joint=True)
+            time.sleep(TIME_SLEEP)
+            
+            # 使用父类的move_and_detect方法移动到目标位置
+            target_pos, target_ori = self.move_and_detect(
+                object=HOLE, 
+                target_hole_idx=target_hole_idx
+            )
+            
+            print(f"检测到目标圆孔位置: {target_pos}, 姿态: {target_ori}")
+            
+            # 移动到手眼标定位置（添加偏移）
+            current_pos = self.aubo.get_current_waypoint()['pos']
+            final_pos = [
+                current_pos[0] + HAND_IN_EYE_OFFSET[0],
+                current_pos[1] + HAND_IN_EYE_OFFSET[1], 
+                current_pos[2] + HAND_IN_EYE_OFFSET[2] + DZ
+            ]
+            final_ori = quaternion_standard2rpy(self.aubo.get_current_waypoint()['ori'])
+            
+            print(f"移动到最终插入位置: {final_pos}")
+            self.aubo.movel(final_pos, final_ori, joint=True)
+            time.sleep(TIME_SLEEP)
+            
+            print(f"已成功移动到目标圆孔位置 (索引: {target_hole_idx})")
+            return True
+            
+        except Exception as e:
+            print(f"移动到圆孔位置时发生错误: {e}")
+            return False
 
 def main():
-    # 初始化机器人和相机
-    img_processor = ImageProcessor(model_weights=YOLO_WEIGHTS, show=True)
-    aubo = AuboController(ip=ROBOT_IP, port=ROBOT_PORT, enable_log=True)
-    mvs = MVSController()
-    aubo.set_joint_maxacc(JOINT_MAX_ACC)
-    aubo.set_joint_maxvelc(JOINT_MAX_VELC)
-    aubo.set_end_speed(END_MAX_VELC)
-    aubo.set_end_acc(END_MAX_ACC)
-    init_pos = deepcopy(ROBOT_INIT_POS)
-    init_ori = deepcopy(ROBOT_INIT_ORI)
-    print("设备初始化完成。")
-
-    # 移动到初始位置
-    aubo.movel(init_pos, init_ori, joint=True)
-    time.sleep(TIME_SLEEP)  # 等待机械臂稳定
-
-    # 循环拍照并查找圆
-    pos_error = 10 # 位置误差
-    current_pos = deepcopy(init_pos)
-    current_ori = deepcopy(init_ori)
-    while pos_error > POS_ERROR_THRESHOLD:
-        img = mvs.get_image()
-        if img is None:
-            print("未获取到图像")
-            continue
+    """主函数"""
+    print("初始化插孔客户端...")
+    
+    # 创建插孔客户端（继承自RobotClient）
+    hole_client = HoleInsertClient()
+    
+    # 检查连接状态
+    if hole_client.client_socket is None:
+        print("视觉服务器未连接，退出程序")
+        hole_client.aubo.disconnect()
+        return
+    
+    print("设备初始化完成")
+    
+    try:
+        # 获取目标孔位索引
+        target_hole_idx = TARGET_HOLE_IDX
+        user_input = input(f"请输入目标圆孔索引 (默认: {target_hole_idx}): ").strip()
+        if user_input:
+            try:
+                target_hole_idx = int(user_input)
+            except ValueError:
+                print("输入无效，使用默认值")
         
-        hole_list, _ = img_processor.detect_hole(
-            img,
-            circle_fit_method='EdgeDrawing',
-        )
-        idx = TARGET_HOLE_IDX
-        assert hole_list[idx][2] is not None, "Target circle not found"
-        u, v, r = hole_list[idx]
-        print(f"圆心: ({u:.3f}, {v:.3f}), 半径: {r:.3f}")
+        # 执行插孔操作
+        success = hole_client.move_to_hole_position(target_hole_idx)
         
-        # 计算相对移动位置
-        U = np.array([u, v])
-        U0 = np.array(INTRINSIC_U0)
-        A = np.array(INTRINSIC_A)
-        Delta_X = - np.linalg.inv(A).dot(U - U0)/1000
+        if success:
+            print("插孔定位完成！")
+        else:
+            print("插孔操作失败")
         
-        # 计算新的末端位置，评估当前检测的误差
-        pos_error = np.linalg.norm(Delta_X)
-        new_pos = np.array(current_pos) + np.array([Delta_X[0], Delta_X[1], 0])
-        new_ori = current_ori  # 姿态保持不变
-        print(f"移动到新位置: {current_pos}, 姿态: {current_ori}")
-        aubo.movel(new_pos.tolist(), new_ori, joint=True)
-        time.sleep(TIME_SLEEP)  # 等待机械臂稳定
-        current_pos = new_pos.tolist()
-        current_ori = new_ori
-
-    current_pos = aubo.get_current_waypoint()['pos']
-    target_pos = np.array(current_pos) + np.array(HAND_IN_EYE_OFFSET)
-    target_ori = quaternion_standard2rpy(aubo.get_current_waypoint()['ori'])
-    aubo.movel(target_pos.tolist(), target_ori, joint=True)  # 移动到手眼标定位置
-    time.sleep(TIME_SLEEP)  # 等待机械臂稳定
-    aubo.disconnect()
-    mvs.close_device()
-
+    except KeyboardInterrupt:
+        print("收到中断信号，程序退出")
+    except Exception as e:
+        print(f"程序执行过程中发生错误: {e}")
+    finally:
+        # 清理资源（继承自RobotClient的disconnect方法）
+        hole_client.disconnect()
+        print("插孔程序结束")
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        print(f"发生错误: {e}")
-    finally:
-        cv2.destroyAllWindows()
-        print("已经移动到目标孔位置，程序结束。")
+    main()

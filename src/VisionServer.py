@@ -20,6 +20,10 @@ WAITKEY = Const.Task.WAITKEY  # OpenCV窗口等待时间
 
 TARGET_HOLE_IDX_LIST = Const.Task.TARGET_HOLE_IDX_LIST 
 
+# CLASS INFO
+GEAR = Const.ClassInfo.GEAR_CLASS
+HOLE = Const.ClassInfo.HOLE_CLASS
+CALIB = Const.ClassInfo.CALIB_CLASS
 def recv_exact(sock: socket.socket, n: int) -> bytes:
     """阻塞读取正好 n 字节；若对端关闭或异常则抛出 EOFError"""
     buf = bytearray()
@@ -103,7 +107,15 @@ class VisionServer:
                 self.img_queue.put_nowait(img)
             except queue.Empty:
                 pass
-    
+    @staticmethod
+    def encode_img(img):
+        """将 numpy 图像编码为基础格式（bytes），适合网络传输"""
+        # 推荐用 PNG，无损且体积小
+        success, buffer = cv2.imencode('.png', img)
+        if not success:
+            return None
+        return buffer.tobytes()
+
     def handle_client(self,  client_socket: socket.socket):
         while True:
             # 接收客户端的请求：4字节长度 + payload
@@ -129,7 +141,7 @@ class VisionServer:
             # 处理指令
             if client_command.get('command') == 'detect':
                 obj = client_command.get('object')
-                if obj == 'hole':
+                if obj == HOLE:
                     target_hole_idx = client_command.get('target_hole_idx', 0)
                     t1 = cv2.getTickCount()
                     img = self.mvs_handle.get_image()
@@ -157,7 +169,8 @@ class VisionServer:
                     t4 = cv2.getTickCount()
 
                     # 序列化数
-                    result = {'status': 'success', 'result': [float(u), float(v), float(r)]}
+                    img_bytes = self.encode_img(img)
+                    result = {'status': 'success', 'result': [float(u), float(v), float(r)], 'img': img_bytes}
                     data_to_send = pickle.dumps(result)
                     # 发送数据长度
                     client_socket.sendall(len(data_to_send).to_bytes(4, byteorder='big'))
@@ -168,8 +181,39 @@ class VisionServer:
                     print(f'get_image处理时间：{(t3 - t1) / cv2.getTickFrequency()}s')
                     print(f'YOLO处理时间：{(t4 - t3) / cv2.getTickFrequency()}s')
                     print(f'数据传输时间：{(t2 - t4) / cv2.getTickFrequency()}s')
+                
+                elif obj == CALIB:
+                    t1 = cv2.getTickCount()
+                    img = self.mvs_handle.get_image()
+                    if img is None:
+                        print("未获取到图像")
+                        continue
+                    t3 = cv2.getTickCount()
+                    calib_circle, show_img = self.img_processor.detect_calib_hole(
+                        img,
+                        circle_fit_method='EdgeDrawing',
+                    )
 
-                elif obj == 'gear':
+                    if show_img is not None:
+                        self.send_to_display(show_img)
+                    t4 = cv2.getTickCount()
+
+                    # 序列化数
+                    u, v, r = calib_circle
+                    img_bytes = self.encode_img(img)
+                    result = {'status': 'success', 'result': [float(u), float(v), float(r)], 'img': img_bytes}
+                    data_to_send = pickle.dumps(result)
+                    # 发送数据长度
+                    client_socket.sendall(len(data_to_send).to_bytes(4, byteorder='big'))
+                    # 发送数据
+                    client_socket.sendall(data_to_send)
+                    print('处理结果已发送给客户端')
+                    t2 = cv2.getTickCount()
+                    print(f'get_image处理时间：{(t3 - t1) / cv2.getTickFrequency()}s')
+                    print(f'YOLO处理时间：{(t4 - t3) / cv2.getTickFrequency()}s')
+                    print(f'数据传输时间：{(t2 - t4) / cv2.getTickFrequency()}s')
+                
+                elif obj == GEAR:
                     t1 = cv2.getTickCount()
                     img = self.mvs_handle.get_image()
                     if img is None:
@@ -191,7 +235,8 @@ class VisionServer:
                     t4 = cv2.getTickCount()
 
                     # 序列化数
-                    result = {'status': 'success', 'result': [gear_pos, float(gear_angle)]}
+                    img_bytes = self.encode_img(img)
+                    result = {'status': 'success', 'result': [gear_pos, float(gear_angle)], 'img': img_bytes}
                     data_to_send = pickle.dumps(result)
                     # 发送数据长度
                     client_socket.sendall(len(data_to_send).to_bytes(4, byteorder='big'))

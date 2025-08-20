@@ -10,36 +10,38 @@ class Const:
         """机器人相关配置"""
         IP = '192.168.70.100'
         PORT = 8899
-        INIT_POS = [-0.451483, -0.158571, 0.345734]  # 初始位置 [x, y, z] 单位: m
+        # INIT_POS = [-0.451483, -0.158571, 0.345734]  # 初始位置 [x, y, z] 单位: m
+        INIT_POS = [-0.451483, -0.158571, 0.246410]
         INIT_ORI = [PI, 0, -PI/2]  # 初始姿态 [roll, pitch, yaw] 单位: rad
-        CALIB_POS = [-0.457865, -0.075589, 0.345734]  # 校准位置 [x, y, z] 单位: m
+        CALIB_POS = [-0.460314, -0.076025, 0.246410]  # 校准位置 [x, y, z] 单位: m
         CALIB_ORI = [PI, 0, -PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
         # -0.1148   -0.001547 -0.11437  -0.0015649 
-        HAND_IN_EYE_OFFSET = [-0.114635, -0.00163165, -0.259]
+        
         # HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.20] # 手眼标定位置 [x, y, z] 单位: m
-        JOINT_MAX_ACC = [0.1] * 6
-        JOINT_MAX_VELC = [0.1] * 6
-        END_MAX_ACC = 0.1
-        END_MAX_VELC = 0.1
-        JOINT_STABLE_ACC = [0.1] * 6
-        JOINT_STABLE_VELC = [0.1] * 6
-        END_STABLE_ACC = 0.1
-        END_STABLE_VELC = 0.1
+        JOINT_MAX_ACC = [0.3] * 6
+        JOINT_MAX_VELC = [0.3] * 6
+        END_MAX_ACC = 0.3
+        END_MAX_VELC = 0.3
+        JOINT_STABLE_ACC = [0.15] * 6
+        JOINT_STABLE_VELC = [0.15] * 6
+        END_STABLE_ACC = 0.15
+        END_STABLE_VELC = 0.15
         JOINT_INSERT_ACC = [0.03] * 6  # 插入时的关节最大加速度
         JOINT_INSERT_VELC = [0.03] * 6
         END_INSERT_ACC = 0.03  # 插入时的末端最大加速度
         END_INSERT_VELC = 0.03
         X_OFFSET = 0.11  # 相机X轴偏移量（米） -2.0147132317361707
-        POSE_ERROR_THRESHOLD = 3 * 1e-5  # 位置误差阈值（米） 0.03mm
+        POSE_ERROR_THRESHOLD = 5 * 1e-5  # 位置误差阈值（米） 0.05mm
         # CONTROLLER_INIT_ANGLE = 0.8728294 / 180 * PI  # 控制器初始角度，单位：deg
+        HAND_IN_EYE_OFFSET = [-0.11353273, -0.00085619, -0.159]
         CONTROLLER_INIT_ANGLE = 0.74431351 / 180 * PI
+        STEP = 0.005
+        DZ = 0.037
 
     class Camera:
         IMG_SHAPE_SHOW = (1024, 1536, 3)
-        INTRINSIC_A = [[0.0091, -9.8750],  # 0.3984 px 0.4146 px
-                       [-9.8831,  0.0568]]
-        # INTRINSIC_A = [[0.0081, -9.8759],  # 0.3726 px 0.3540 px
-        #                [-9.8850,  0.0567]]
+        INTRINSIC_A = [[-0.0115, -13.7715],  # 0.4191 px 0.4256 px
+                       [-13.8040,  0.0800]]
         INTRINSIC_U0 = [1536, 1024]
 
     class Vision:
@@ -60,7 +62,7 @@ class Const:
         HOLE_RANSAC_THRESHOLD = 100  
         HOLE_RANSAC_MIN_INLIERS = 0.5  # RANSAC最小内点数
 
-        HOLE_RADIUS = 82  # 孔半径，单位：px
+        HOLE_RADIUS = 112  # 孔半径，单位：px
 
         N_SLICE_ITERS = 2  # 切片迭代次数
 
@@ -73,7 +75,7 @@ class Const:
     class Yolo:
         MODEL_DIE = r'./models'
         YOLO_CIRCLE_WEIGHTS = 'yolov8-circle.pt'
-        YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0812.pt'
+        YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0819.pt'
         # YOLO_HOLE_WEIGHTS = 'yolov8-0803.pt'
         YOLO_CONF = 0.8  # YOLO检测置信度阈值
 
@@ -101,7 +103,7 @@ class Const:
         ]
     class Task:
         """任务相关配置"""
-        TARGET_HOLE_IDX = 3
+        TARGET_HOLE_IDX = 5
         TARGET_HOLE_IDX_LIST = [3, 4, 5]  # 目标孔索引列表
         TIME_SLEEP = 1.0  # 等待机械臂稳定的时间
         WAITKEY = 30  # OpenCV窗口等待时间

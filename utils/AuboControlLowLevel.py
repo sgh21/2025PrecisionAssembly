@@ -180,68 +180,39 @@ class AuboController:
 
 
 if __name__== "__main__":
-    ip = '192.168.70.100'
-    port = 8899
-    aubo = AuboController(ip = ip, port = port)
-    print("AuboController initialized.")
+    from ConstConfig import Const
+    from Transform import *
+    from copy import deepcopy
 
+    ip = Const.Robot.IP
+    port = Const.Robot.PORT
+    joint_maxacc = Const.Robot.JOINT_MAX_ACC
+    joint_maxvelc = Const.Robot.JOINT_MAX_VELC
+    end_max_acc = Const.Robot.END_MAX_ACC
+    end_max_velc = Const.Robot.END_MAX_VELC
+
+    hand_in_eye_offset = Const.Robot.HAND_IN_EYE_OFFSET
+
+    aubo = AuboController(ip=ip, port=port)
     # 设置运动参数
-    aubo.set_joint_maxacc([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
-    aubo.set_joint_maxvelc([0.1, 0.1, 0.1, 0.1, 0.1, 0.1])
-    aubo.set_end_speed(0.1)
-    aubo.set_end_acc(0.1)
+    aubo.set_joint_maxacc(joint_maxacc)
+    aubo.set_joint_maxvelc(joint_maxvelc)
+    aubo.set_end_speed(end_max_velc)
+    aubo.set_end_acc(end_max_acc)
 
-    print(aubo.get_current_waypoint())
+    current_waypoint = aubo.get_current_waypoint()
+    print(current_waypoint)
 
-    # 移动到初始位置
-    from configs.config import *
-    init_pos = ROBOT_INIT_POS
-    init_ori = ROBOT_INIT_ORI
-    # init_ori_quaternion = rpy2quaternion_standard(np.array(init_ori))  # 转换为四元数
-    # print("Initial position:", init_pos)
-    # print("Initial orientation (quaternion):", init_ori_quaternion)
-    try:
-        aubo.movel(init_pos, init_ori, joint=True)
-        print("Moved to initial position successfully.")
-    except ValueError as e:
-        print(f"Error during initial movement: {e}")
-    
-    # delta_joint = np.array([5, 5, 5, 0, 5, 5]) * np.pi / 180  # 转换为弧度
-    # current_joint = aubo.get_current_waypoint()['joint']
-    # target_joint = np.array(current_joint) + delta_joint
-    # print("Current joint angles:", current_joint)
-    # print("Target joint angles:", target_joint)
+    # 开启此处确定标定平面
+    input('请确定已经将机器人移动到和齿轮标定板相当高度，按下任意键继续...')
+    current_pos = current_waypoint['pos']
+    current_rpy = quaternion_standard2rpy(current_waypoint['ori']) 
 
-    # # 执行关节空间运动
-    # try:
-    #     aubo.movej(target_joint)
-    #     print("Moved to target joint angles successfully.")
-    # except ValueError as e:
-    #     print(f"Error during joint movement: {e}")
+    init_pos = deepcopy(current_pos)
+    init_pos[2] -= hand_in_eye_offset[2]
+    init_ori = deepcopy(current_rpy)
 
-    # # 执行笛卡尔空间运动
-    # delta_pos = [0.0, 0.0, 0.05]  # 目标位置
-    # delta_ori = [0.0, 0.0, 10 / 180 *np.pi]  # 目标姿态（欧拉角）
-    # current_waypoint = aubo.get_current_waypoint()
-    # current_pos = current_waypoint['pos']
-    # current_ori = current_waypoint['ori']
-    # current_ori_qu = standard2quaternion(current_ori)  # 转换为标准四元数形式
-    # current_ori_rpy = quaternion2rpy(current_ori_qu)  # 转换为欧拉角形式
-    # target_pos = np.array(current_pos) + np.array(delta_pos)
-    # target_ori = np.array(current_ori_rpy) + np.array(delta_ori)
-    # print("Current position:", current_pos)
-    # print("Target position:", target_pos)
-    # try:
-    #     aubo.movel(target_pos, target_ori, joint=True)
-    #     # print("Target joint angles:", np.array(result) * 180 / np.pi)  # 转换为角度
-    #     print("Moved to target position successfully.")
-    # except ValueError as e:
-    #     print(f"Error during Cartesian movement: {e}")
-    
-    # current_waypoint = aubo.get_current_waypoint()
-    # current_pos = current_waypoint['pos']
-    # current_ori = current_waypoint['ori']
-    # current_ori = quaternion_standard2rpy(current_ori)  # 转换为欧拉角形式
-    # target_pos = np.array(current_pos) + np.array(HAND_IN_EYE_OFFSET)  # 向前移动0.1米
-    # aubo.movel(target_pos, current_ori, joint=True)
+    input(f'目标姿态:pos {init_pos}, 姿态: {init_ori}，按下任意键继续...')
+    aubo.movel(init_pos, init_ori, joint=False )
+    print(f"移动到目标姿态: {init_pos}, 姿态: {init_ori}")
     aubo.disconnect()
