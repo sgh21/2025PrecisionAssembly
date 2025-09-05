@@ -319,7 +319,7 @@ def main():
     # 创建 VisionServer 实例 
     # * :确定是否使用相机
     vision_server = VisionServer(host = VISION_HOST, port = VISION_PORT, show=True)
-    if(not vision_server.init_camera(show=False)):
+    if(not vision_server.init_camera(show=True)):
         raise Exception("Camera init failed")
 
     # 等待客户端连接,阻塞，开始热身

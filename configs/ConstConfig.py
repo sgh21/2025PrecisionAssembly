@@ -33,8 +33,8 @@ class Const:
         X_OFFSET = 0.11  # 相机X轴偏移量（米） -2.0147132317361707
         POSE_ERROR_THRESHOLD = 5 * 1e-5  # 位置误差阈值（米） 0.05mm
         # CONTROLLER_INIT_ANGLE = 0.8728294 / 180 * PI  # 控制器初始角度，单位：deg
-        HAND_IN_EYE_OFFSET = [-0.11353273, -0.00085619, -0.159]
-        CONTROLLER_INIT_ANGLE = 0.74431351 / 180 * PI
+        HAND_IN_EYE_OFFSET = [-0.113506585, -0.00082392, -0.159]
+        CONTROLLER_INIT_ANGLE = 0.555 / 180 * PI
         STEP = 0.005
         DZ = 0.037
 
@@ -104,7 +104,7 @@ class Const:
     class Task:
         """任务相关配置"""
         TARGET_HOLE_IDX = 5
-        TARGET_HOLE_IDX_LIST = [3, 4, 5]  # 目标孔索引列表
+        TARGET_HOLE_IDX_LIST = [0, 1, 2, 3, 4, 5]  # 目标孔索引列表
         TIME_SLEEP = 1.0  # 等待机械臂稳定的时间
         WAITKEY = 30  # OpenCV窗口等待时间
 

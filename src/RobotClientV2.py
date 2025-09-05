@@ -310,7 +310,7 @@ class RobotClient:
         for pos, ori in zip(target_insert_pos_list, target_insert_ori_list):
             print(f"插入位置: {pos}, 姿态: {ori}")
             self.aubo.movel(pos, ori, joint=False)
-            input("请确认圆孔已插入，按回车键继续.")
+            # input("请确认圆孔已插入，按回车键继续.")
         else:
             print("圆孔插入完成，回到初始位置。")
             self.set_robot_mode('fast')
