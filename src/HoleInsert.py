@@ -2,6 +2,11 @@ import os
 import cv2
 import time
 from copy import deepcopy
+import os, sys
+workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print("workspace:", workspace)
+sys.path.append(workspace)
+sys.path.append(os.path.join(workspace, 'configs'))
 from ConstConfig import Const
 from RobotClientV2 import RobotClient
 from Transform import *

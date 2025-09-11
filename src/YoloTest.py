@@ -1,12 +1,17 @@
 import cv2
-import os
+import os, sys
+workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print("workspace:", workspace)
+sys.path.append(workspace)
+sys.path.append(os.path.join(workspace, 'configs'))
 from ultralytics import YOLO
 from ConstConfig import Const
 
 IMG_SHAPE_SHOW = Const.Camera.IMG_SHAPE_SHOW
-YOLO_WEIGHTS = os.path.join(Const.Yolo.MODEL_DIE, Const.Yolo.YOLO_HOLE_WEIGHTS)
+YOLO_WEIGHTS = os.path.join(workspace, Const.Yolo.MODEL_DIR, Const.Yolo.YOLO_HOLE_WEIGHTS)
 DATASET_DIR = Const.Data.DATASET_DIR
-IMG_DIR = os.path.join(DATASET_DIR, 'yolo_0803/train/images')
+# IMG_DIR = os.path.join(DATASET_DIR, 'yolo_0803/train/images')
+IMG_DIR = os.path.join(workspace, 'test', 'images')
 
 def infer_and_show(model, img, win_name="YOLO"):
     results = model(img)

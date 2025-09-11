@@ -6,6 +6,11 @@ import os
 import cv2
 import threading
 import numpy as np  # needed for warmup printing
+import os, sys
+workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print("workspace:", workspace)
+sys.path.append(workspace)
+sys.path.append(os.path.join(workspace, 'configs'))
 from MVSControl import MVSController
 from ComputePose import ImageProcessor
 from ConstConfig import Const
@@ -14,7 +19,7 @@ from Transform import *
 VISION_HOST = Const.Vision.HOST
 VISION_PORT = Const.Vision.PORT
 
-YOLO_WEIGHTS = os.path.join(Const.Yolo.MODEL_DIE,
+YOLO_WEIGHTS = os.path.join(workspace, Const.Yolo.MODEL_DIR,
                             Const.Yolo.YOLO_HOLE_WEIGHTS)
 WAITKEY = Const.Task.WAITKEY  # OpenCV窗口等待时间
 
@@ -148,6 +153,7 @@ class VisionServer:
                     if img is None:
                         print("未获取到图像")
                         continue
+                    self.send_to_display(img)
                     t3 = cv2.getTickCount()
                     hole_list, show_img = self.img_processor.detect_hole(
                         img,
@@ -199,9 +205,12 @@ class VisionServer:
                     t4 = cv2.getTickCount()
 
                     # 序列化数
-                    u, v, r = calib_circle
                     img_bytes = self.encode_img(img)
-                    result = {'status': 'success', 'result': [float(u), float(v), float(r)], 'img': img_bytes}
+                    if calib_circle is not None:
+                        u, v, r = calib_circle
+                        result = {'status': 'success', 'result': [float(u), float(v), float(r)], 'img': img_bytes}
+                    else:
+                        result = {'status': 'error', 'result': None, 'img': img_bytes}
                     data_to_send = pickle.dumps(result)
                     # 发送数据长度
                     client_socket.sendall(len(data_to_send).to_bytes(4, byteorder='big'))
@@ -319,11 +328,12 @@ def main():
     # 创建 VisionServer 实例 
     # * :确定是否使用相机
     vision_server = VisionServer(host = VISION_HOST, port = VISION_PORT, show=True)
-    if(not vision_server.init_camera(show=True)):
+    if(not vision_server.init_camera(show=False)):
         raise Exception("Camera init failed")
 
     # 等待客户端连接,阻塞，开始热身
     vision_server.start()
+
     client_socket , addr = vision_server.server_socket.accept()
     print(f"来自 {addr} 的连接已建立。")
     vision_server.stop_warmup()
@@ -333,8 +343,8 @@ def main():
     vision_server.handle_client(client_socket)
 
     client_socket.close()
-    vision_server.close()
     print(f"与 {addr} 的连接已关闭。")
+    vision_server.close()
 
 if __name__ == '__main__':
     main()

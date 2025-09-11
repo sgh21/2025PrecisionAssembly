@@ -1,3 +1,6 @@
+'''
+使用九点标定法对相机内参进行标定，尚未测试
+'''
 import os
 import time
 from copy import deepcopy
@@ -15,7 +18,7 @@ from AuboControlLowLevel import AuboController
 from MVSControl import MVSController
 from ComputePose import ImageProcessor
 from ConstConfig import Const
-# TODO: 待更新，需要适配新的视觉算法
+
 # ====== 配置参数 ======
 ROBOT_IP = Const.Robot.IP
 ROBOT_PORT = Const.Robot.PORT
@@ -23,7 +26,7 @@ INIT_POS = deepcopy(Const.Robot.CALIB_POS)        # 初始位置 [x, y, z] 单�
 INIT_ORI = deepcopy(Const.Robot.CALIB_ORI)        # 初始姿态 [roll, pitch, yaw] 单位: rad
 PLANE_AXIS = [0, 1]                         # 平面内移动的轴（如x和y）
 STEP = 0.015                                # 步长（米）
-GRID_SIZE = 3                               # 3x3网格
+GRID_SIZE = 5                               # 3x3网格
 DATASET_DIR = Const.Data.DATASET_DIR
 SAVE_DIR = os.path.join(DATASET_DIR, 'intrinsic_calib')
 os.makedirs(SAVE_DIR, exist_ok=True)
@@ -38,17 +41,17 @@ YOLO_WEIGHTS = os.path.join(Const.Yolo.MODEL_DIR,
                             Const.Yolo.YOLO_HOLE_WEIGHTS)
 
 CALIB = Const.ClassInfo.CALIB_CLASS
-def generate_plane_positions(init_pos, axis, step, grid_size):
-    """生成平面内9点标定的机械臂末端位置"""
-    positions = []
-    center = np.array(init_pos)
-    for i in range(grid_size):
-        for j in range(grid_size):
-            pos = center.copy()
-            pos[axis[0]] += (i - grid_size // 2) * step
-            pos[axis[1]] += (j - grid_size // 2) * step
-            positions.append(pos.tolist())
-    return positions
+# def generate_plane_positions(init_pos, axis, step, grid_size):
+#     """生成平面内9点标定的机械臂末端位置"""
+#     positions = []
+#     center = np.array(init_pos)
+#     for i in range(grid_size):
+#         for j in range(grid_size):
+#             pos = center.copy()
+#             pos[axis[0]] += (i - grid_size // 2) * step
+#             pos[axis[1]] += (j - grid_size // 2) * step
+#             positions.append(pos.tolist())
+#     return positions
 
 def fit_intrinsic_params(df, save_dir):
     """对标定数据进行拟合并保存结果和可视化"""
@@ -133,60 +136,57 @@ def main_client():
     robot_client.set_robot_mode('stable')
 
     # 生成9点平面内标定位置
-    positions = generate_plane_positions(INIT_POS, PLANE_AXIS, STEP, GRID_SIZE)
-    ori = INIT_ORI
-
+    # positions = generate_plane_positions(INIT_POS, PLANE_AXIS, STEP, GRID_SIZE)
+    
     robot_client.aubo.movel(INIT_POS, INIT_ORI, joint=True )
     time.sleep(TIME_SLEEP)  # 等待机械臂稳定
 
     records = []
-    for idx, pos in enumerate(positions):
-        print(f"[{idx+1}/{GRID_SIZE * GRID_SIZE}] 移动到位置: {pos}")
-        try:
-            robot_client.aubo.movel(pos, ori, joint=True)
-            time.sleep(TIME_SLEEP)  # 等待机械臂稳定
 
-            circle, img = robot_client.detect(object=CALIB)
-            # 如果需要多次采集同一位置的图像
-            if circle is not None:
-                u, v, r = circle
-                print(f"检测到圆心像素: ({u:.2f}, {v:.2f})")
-            else:
-                u, v, r = np.nan, np.nan, np.nan
-                print("未检测到圆心")
-            if img is not None:
-                    # 在图像上画出圆心和圆
-                img_draw = img.copy()
-                cv2.circle(img_draw, (int(u), int(v)), int(r), (0,255,0), 2)
-                cv2.circle(img_draw, (int(u), int(v)), 3, (0,0,255), -1)
+    try:
+        robot_client.aubo.movel(INIT_POS, INIT_ORI, joint=True)
+        time.sleep(TIME_SLEEP)  # 等待机械臂稳定
 
-                # 保存图片
-                img_name = f"calib_{idx+1:02d}.png"
-                cv2.imwrite(os.path.join(SAVE_DIR, img_name), img_draw)
-                # 记录数据
-                records.append({
-                    'idx': idx+1,
-                    'x': pos[0] * 1000, 'y': pos[1] * 1000, 'z': pos[2] * 1000,
-                    'u': u, 'v': v, 'r': r,
-                    'img': img_name
-                })
-            else:
-                print("采集图像失败，跳过。")
-                records.append({
-                    'idx': idx+1,
-                    'x': pos[0] * 1000, 'y': pos[1] * 1000, 'z': pos[2] * 1000,
-                    'u': np.nan, 'v': np.nan, 'r': np.nan,
-                    'img': None
-                })
-        except Exception as e:
-            print(f"采集第{idx+1}点时出错: {e}")
+        circle, img = robot_client.detect(object=CALIB)
+        # 如果需要多次采集同一位置的图像
+        if circle is not None:
+            u, v, r = circle
+            print(f"检测到圆心像素: ({u:.2f}, {v:.2f})")
+        else:
+            u, v, r = np.nan, np.nan, np.nan
+            print("未检测到圆心")
+        if img is not None:
+                # 在图像上画出圆心和圆
+            img_draw = img.copy()
+            cv2.circle(img_draw, (int(u), int(v)), int(r), (0,255,0), 2)
+            cv2.circle(img_draw, (int(u), int(v)), 3, (0,0,255), -1)
+
+            # 保存图片
+            img_name = f"calib_{idx+1:02d}.png"
+            cv2.imwrite(os.path.join(SAVE_DIR, img_name), img_draw)
+            # 记录数据
+            records.append({
+                'idx': idx+1,
+                'x': pos[0] * 1000, 'y': pos[1] * 1000, 'z': pos[2] * 1000,
+                'u': u, 'v': v, 'r': r,
+                'img': img_name
+            })
+        else:
+            print("采集图像失败，跳过。")
             records.append({
                 'idx': idx+1,
                 'x': pos[0] * 1000, 'y': pos[1] * 1000, 'z': pos[2] * 1000,
                 'u': np.nan, 'v': np.nan, 'r': np.nan,
                 'img': None
             })
-            continue
+    except Exception as e:
+        print(f"采集第{idx+1}点时出错: {e}")
+        records.append({
+            'idx': idx+1,
+            'x': pos[0] * 1000, 'y': pos[1] * 1000, 'z': pos[2] * 1000,
+            'u': np.nan, 'v': np.nan, 'r': np.nan,
+            'img': None
+        })
 
     # 保存所有数据到CSV
     df = pd.DataFrame(records)

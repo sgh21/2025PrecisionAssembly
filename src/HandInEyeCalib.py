@@ -4,6 +4,11 @@ import cv2
 import time
 import numpy as np
 from copy import deepcopy
+import os, sys
+workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print("workspace:", workspace)
+sys.path.append(workspace)
+sys.path.append(os.path.join(workspace, 'configs'))
 from RobotClientV2 import RobotClient
 from ConstConfig import Const
 from Transform import *
@@ -174,6 +179,8 @@ def main():
     # 创建手眼标定客户端（继承自RobotClient）
     calib_client = HandInEyeCalibClient()
     
+    real_hole_pos = calib_client.aubo.get_current_waypoint()['pos']
+
     # 检查连接状态
     if calib_client.client_socket is None:
         print("视觉服务器未连接，退出程序")
@@ -214,6 +221,7 @@ def main():
     except Exception as e:
         print(f"程序执行过程中发生错误: {e}")
     finally:
+        calib_client.aubo.movel(pos=real_hole_pos, ori=Const.Robot.INIT_ORI, joint=True)
         # 清理资源（继承自RobotClient的disconnect方法）
         calib_client.disconnect()
         cv2.destroyAllWindows()

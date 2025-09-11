@@ -3,6 +3,13 @@ import numpy as np
 import cv2
 import time
 import copy
+
+import os, sys
+workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print("workspace:", workspace)
+sys.path.append(workspace)
+sys.path.append(os.path.join(workspace, 'configs'))
+
 from ConstConfig import Const
 from Transform import *
 from AuboControlLowLevel import AuboController
@@ -16,7 +23,7 @@ INIT_POS = copy.deepcopy(Const.Robot.INIT_POS)          # 初始位置 [x, y, z]
 INIT_ORI = copy.deepcopy(Const.Robot.INIT_ORI)          # 初始姿态 [roll, pitch, yaw] 单位: rad
 POS_RANGE = [0.025, 0.025, 0.0]                     # 每个方向最大扰动范围 ±m
 ORI_RANGE = [0, 0, 10]                            # 姿态扰动范围 ±deg
-NUM_SAMPLES = 50                                  # 采集数量
+NUM_SAMPLES = 30                                  # 采集数量
 DATASET_DIR = r'./documents/dataset/0819/images'  # 保存路径
 
 os.makedirs(DATASET_DIR, exist_ok=True)

@@ -6,6 +6,14 @@ import pickle
 import numpy as np
 from copy import deepcopy
 from typing import List, Optional, Tuple
+
+import os, sys
+workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+print("workspace:", workspace)
+sys.path.append(os.path.join(workspace, 'lib'))
+sys.path.append(os.path.join(workspace, 'utils'))
+sys.path.append(os.path.join(workspace, 'configs'))
+
 from AuboControlLowLevel import AuboController
 from ConstConfig import Const
 from Transform import *
@@ -35,7 +43,21 @@ ROBOT_INIT_POS = Const.Robot.INIT_POS
 ROBOT_INIT_ORI = Const.Robot.INIT_ORI
 HAND_IN_EYE_OFFSET = Const.Robot.HAND_IN_EYE_OFFSET
 CONTROLLER_INIT_ANGLE = Const.Robot.CONTROLLER_INIT_ANGLE  
-CONTROLLER_INIT_ANGLE_LIST = Const.Robot.CONTROLLER_INIT_ANGLE_LIST
+
+INCLINE = Const.Robot.INCLINE               # 是否考虑安装板倾斜
+INCLINE = False
+T_BOARD2BASE = Const.Robot.T_BOARD2BASE     # TODO:尚未完成标定
+T_BOARD2BASE = [[-0.707, -0.707, 0, -0.45],
+                [0.707, -0.707, 0, -0.15],
+                [0, 0, 1, 0.15],
+                [0, 0, 0, 1]]  # 示例值，需替换为实际标定结果
+T_IDEAL2BASE = [[1, 0, 0, T_BOARD2BASE[0][3]],
+                      [0, 1, 0, T_BOARD2BASE[1][3]],
+                      [0, 0, 1, T_BOARD2BASE[2][3]],
+                      [0, 0, 0, 1]]  # 不考虑倾斜的理想情况下的变换矩阵
+T_BOARD2IDEAL = (np.linalg.inv(np.array(T_IDEAL2BASE))@np.array(T_BOARD2BASE)).tolist()
+T_IDEAL2BOARD = np.linalg.inv(np.array(T_BOARD2IDEAL)).tolist()
+
 
 TARGET_HOLE_IDX_LIST = Const.Task.TARGET_HOLE_IDX_LIST
 TARGET_HOLE_IDX = Const.Task.TARGET_HOLE_IDX  # 默认目标圆孔索引
@@ -56,6 +78,7 @@ def recv_exact(sock: socket.socket, n: int) -> bytes:
             raise EOFError("connection closed")
         buf.extend(chunk)
     return bytes(buf)
+
 
 class RobotClient:
     def __init__(self):
@@ -138,7 +161,21 @@ class RobotClient:
             self.aubo.set_end_acc(Const.Robot.END_INSERT_ACC)
         else:
             raise ValueError(f"Unsupported mode: {mode}")
-    
+
+    def ideal2board(self, pos: List[float]) -> List[float]:
+        """将理想安装板条件下基坐标系的位置转换到实际安装板条件下的基坐标
+
+        param:
+            pos: (list),理想安装板条件下基坐标系中的位置 [x, y, z]
+        """
+        T_ideal2base = np.array(T_IDEAL2BASE)
+        T_board2base = np.array(T_BOARD2BASE)
+        pos_base = np.array([pos[0], pos[1], pos[2], 1]).reshape(4, 1)
+        pos_ideal = np.linalg.inv(T_ideal2base).dot(pos_base).flatten()
+        pos_board = T_board2base.dot(pos_ideal).flatten()
+        return pos_board[:3].tolist()
+
+
     def detect(self, 
                object: str, 
                target_hole_idx: int = Const.Task.TARGET_HOLE_IDX) -> Optional[Tuple[float, float, float]]:
@@ -165,14 +202,7 @@ class RobotClient:
         current_pos = deepcopy(current_waypoint['pos'])
         current_ori = quaternion_standard2rpy(current_waypoint['ori'])
 
-        cnt = 0
-        pos_error_threshold = POS_ERROR_THRESHOLD
-        while pos_error > pos_error_threshold:
-            # cnt+=1
-            # if cnt >= 5:
-            #     pos_error_threshold += POS_ERROR_THRESHOLD*0.1
-            #     cnt = 0
-            #     print(f"多次检测未能满足位置误差要求，放宽位置要求：{pos_error_threshold}米")
+        while pos_error > POS_ERROR_THRESHOLD:
             # 发送检测命令
             self.send_command({'command': 'detect','object': object, 'target_hole_idx': target_hole_idx})
             result = self.receive_data()
@@ -198,15 +228,16 @@ class RobotClient:
             U = np.array([u, v])
             U0 = np.array(INTRINSIC_U0)
             A = np.array(INTRINSIC_A)
-            Delta_X = -np.linalg.inv(A).dot(U - U0)/1000
+            Delta_X = - np.linalg.inv(A).dot(U - U0)/1000
             # 计算新的末端位置，评估当前检测的误差
             pos_error = np.linalg.norm(Delta_X)
-            new_pos = np.array(current_pos) + np.array([Delta_X[0], Delta_X[1], 0])#*0.8
+            # new_pos = np.array(current_pos) + np.array([Delta_X[0], Delta_X[1], 0])
+            new_pos = self.calc_dest_pos(current_pos, [Delta_X[0], Delta_X[1], 0], incline=INCLINE)
             new_ori = current_ori  # 姿态保持不变
-            print(f"移动到新位置: {new_pos.tolist()}, 姿态: {new_ori}, 位置误差: {pos_error*1000:.3f}mm")
-            self.aubo.movel(new_pos.tolist(), new_ori, joint=True)
+            print(f"移动到新位置: {new_pos}, 姿态: {new_ori}")
+            self.aubo.movel(new_pos, new_ori, joint=True)
             time.sleep(TIME_SLEEP)  # 等待机械臂稳定
-            current_pos = new_pos.tolist()
+            current_pos = new_pos
             current_ori = new_ori
 
         current_pos = self.aubo.get_current_waypoint()['pos']
@@ -219,15 +250,12 @@ class RobotClient:
             return target_pos, gear_angle  # 返回齿轮位置和角度
 
     def calculate_safe_approach_waypoints(self, 
-                                        target_hole_idx,
-                                        gear_pos, 
-                                        gear_angle,
-                                        target_pos, 
-                                        target_ori, 
-                                        step=0.005, 
-                                        dz=0.05,
-                                        use_separate_controller_angle=False
-                                        ):
+                                       gear_pos, 
+                                       gear_angle,
+                                       target_pos, 
+                                       target_ori, 
+                                       step=0.005, 
+                                       dz=0.05):
         """
         插孔动作分步：先到连线方向更远处，再靠近孔口，最后竖直插入
         gear_pos: 齿轮中心 [x, y, z]
@@ -251,16 +279,9 @@ class RobotClient:
                 tooth_range=Const.Gear.PRESSURE_ANGLE,
                 normal_to_zero=True
         )
-        print(f"center_connection_angle: {center_connection_angle*180/np.pi:.2f} deg, gear_angle: {gear_angle*180/np.pi:.2f} deg, controller_angle: {controller_angle*180/np.pi:.2f} deg")
 
-        if use_separate_controller_angle:
-            controller_init_angle = CONTROLLER_INIT_ANGLE_LIST[target_hole_idx]
-        else:
-            controller_init_angle = CONTROLLER_INIT_ANGLE
-        print(f"使用预设控制器角度: {controller_init_angle*180/np.pi:.2f} deg")
-
-        delta_controller_angle = controller_init_angle - controller_angle
-        target_insert_pos = np.array(target_pos) +np.array(HAND_IN_EYE_OFFSET) 
+        delta_controller_angle = CONTROLLER_INIT_ANGLE - controller_angle
+        target_insert_pos = np.array(target_pos) + np.array(HAND_IN_EYE_OFFSET) 
         target_insert_ori = np.array(target_ori) + np.array([0, 0, delta_controller_angle])
 
         target_insert_pos_list = []
@@ -316,14 +337,12 @@ class RobotClient:
         print(f"目标圆孔位置: {target_pos}, 姿态: {target_ori}")
 
         target_insert_pos_list, target_insert_ori_list = self.calculate_safe_approach_waypoints(
-            target_hole_idx=target_hole_idx,
             gear_pos=gear_pos,
             gear_angle=gear_angle,
             target_pos=target_pos,
             target_ori=target_ori,
             step = STEP,
-            dz = DZ,
-            use_separate_controller_angle=Const.Robot.SEPARATE_CONTROLLER_INIT_ANGLE  # 不同孔位使用各自的预设控制器角度
+            dz = DZ
         )
 
         self.set_robot_mode('insert')  # 设置机械臂为插入模式

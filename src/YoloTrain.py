@@ -1,13 +1,16 @@
 # Description: Train a YOLOv8 model on a custom dataset
+import os, sys
+workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# print("workspace:", workspace)
+sys.path.append(os.path.join(workspace, 'configs'))
+
 from ultralytics import YOLO
-
 from ConstConfig import Const
-
-data_dir =Const.Data.DATASET_DIR
+data_dir = os.path.join(workspace, 'documents')
 
 if __name__ == "__main__":
     # Load a model
-    model = YOLO("yolo11s-seg.yaml").load(weights='./models/yolov11s-seg-0803.pt')  # build a new model from scratch
+    model = YOLO("yolo11s-seg.yaml").load(weights=workspace+'/models/yolov11s-seg-0803.pt')  # build a new model from scratch
     # model = YOLO("yolov8n-seg.pt")  # load a pretrained model (recommended for training)
 
     # 设置数据增强参数
@@ -30,7 +33,7 @@ if __name__ == "__main__":
    
     # Use the model
     model.train(
-        data=f"{data_dir}/yolo_0812/config.yaml", 
+        data=f"{data_dir}/yolo_0907/config.yaml", 
         epochs=100,
         batch = 16,
         workers = 12,

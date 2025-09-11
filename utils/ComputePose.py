@@ -92,7 +92,9 @@ def EdgeDrawingMethod(gray_img, return_all = False):
         ellipses = ed.detectEllipses()
         print(f"Use EdgeDrawing detected ellipses: {ellipses}")
         if ellipses is not None and len(ellipses) > 0:
-            # 取第一个圆
+            for e in ellipses[0]:
+                if e[2]==0:
+                    e[2] = (e[3]+e[4])/2
             if return_all:
                 return [(float(e[0]), float(e[1]), float(e[2])) for e in ellipses[0]]
             x, y, r = ellipses[0][0][:3]
@@ -254,7 +256,7 @@ class LocateHole:
                               circles: List[Tuple[float, float, float]],
                               radius )-> List[Tuple[float, float, float]]:
                         # 使用半径在80像素做初步筛选
-        heuristic_circles = [c for c in circles if abs(c[2]-radius)<5]
+        heuristic_circles = [c for c in circles if abs(c[2]-radius)<10]
         if len(heuristic_circles) > 0:
             circles = heuristic_circles
         else:
@@ -343,6 +345,65 @@ class LocateHole:
         
         return hole_list
     
+
+    def locate_calib_circle_list(self,
+                            seg_list:List[SegmentResult],
+                            show_img: np.ndarray = None,
+                            circle_fit_method:str = 'EdgeDrawing'):
+        calib_seg_list = self.fliter_boxes_by_class(seg_list, target_cls=Const.ClassInfo.CALIB_CLASS)
+        pos_list = [((seg.xyxy_i[0] + seg.xyxy_i[2]) / 2, (seg.xyxy_i[1] + seg.xyxy_i[3]) / 2, (seg.xyxy_i[2]-seg.xyxy_i[0]+seg.xyxy_i[3]-seg.xyxy_i[1]) / 4) for seg in calib_seg_list]
+        x, y = [p[0] for p in pos_list], [p[1] for p in pos_list]
+        middle_pos = [np.median(x), np.median(y)]
+        distance = np.mean([np.max(x)-np.min(x), np.max(y)-np.min(y)]) / 2
+        ideal_pos = np.array([
+            [middle_pos[0] - distance, middle_pos[1] - distance],
+            [middle_pos[0], middle_pos[1] - distance],
+            [middle_pos[0] + distance, middle_pos[1] - distance],
+            [middle_pos[0] - distance, middle_pos[1]],
+            [middle_pos[0], middle_pos[1]],
+            [middle_pos[0] + distance, middle_pos[1]],
+            [middle_pos[0] - distance, middle_pos[1] + distance],
+            [middle_pos[0], middle_pos[1] + distance],
+            [middle_pos[0] + distance, middle_pos[1] + distance],
+        ], dtype=int)
+        result = pos_list.copy()
+
+        # result = np.ones((9,3)).tolist()        
+        # for calib_seg in calib_seg_list:
+        #     limg = calib_seg.local_img_i
+            
+        #     gray_img = cv2.cvtColor(limg, cv2.COLOR_BGR2GRAY) if len(limg.shape) == 3 else limg
+        #     # 使用指定的圆拟合方法
+        #     circles = None
+        #     if circle_fit_method == 'EdgeDrawing':
+        #         circles = EdgeDrawingMethod(gray_img, return_all=True)
+        #     if circles is None or len(circles) == 0:
+        #         # 使用其它方法或者检测失败时，使用HoughCircles
+        #         circles = HoughCircleMethod(gray_img, return_all=True)
+        #     # TODO: 测试并检查代码逻辑
+        #     if circles is None or len(circles) == 0:
+        #         print("\033[33mWARNING: Circle fitting failed, using bounding box center and radius.\033[0m")
+        #         x1, y1, x2, y2 = calib_seg.xyxy_i
+        #         # 如果圆拟合失败，使用边界框中心和半径
+        #         cx = (x1 + x2) / 2
+        #         cy = (y1 + y2) / 2
+        #         r = max(x2 - x1, y2 - y1) / 2
+        #         circle = (cx, cy, r)
+        #     else:
+        #         circle = self.filter_hole_by_radius(calib_seg.xyxy_i, circles, radius=Const.Vision.HOLE_RADIUS)
+        #     nearest_idx = np.argmin([(circle[0]-ip[0])**2+(circle[1]-ip[1])**2 for ip in ideal_pos])
+        #     result[nearest_idx] = circle
+
+        if show_img is not None:
+            for circle in result:
+                if circle[0] is not None and circle[1] is not None:
+                    cv2.circle(show_img, (int(circle[0]), int(circle[1])), int(circle[2]), (0, 0, 255), 2)
+                    cv2.putText(show_img, "Calib Hole", (int(circle[0]), int(circle[1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
+            
+        return result
+
+
+
     def locate_calib_circle(self, 
                             seg_list:List[SegmentResult], 
                             show_img: np.ndarray = None,
@@ -356,7 +417,8 @@ class LocateHole:
         calib_seg = calib_seg_list[0] if len(calib_seg_list) > 0 else None
 
         if calib_seg is None:
-            raise ValueError("No calibration hole detected.")
+            return None
+            # raise ValueError("No calibration hole detected.")
         
         limg = calib_seg.local_img_i
         
@@ -482,16 +544,16 @@ class LocateGear:
             if show_img is not None :
                 for i, r in enumerate(rho_left):
                     error = np.abs(r - radius_mark)
-                    if min(error) > 20:
-                        continue
+                    # if min(error) > 20:
+                    #     continue
                     idx_left = np.argmin(error)  # 找到最接近radius_mark的点
                     theta_mark = theta_left[i][idx_left]
                     theta_mark_left.append(theta_mark)  # 获取对应的theta值
                     cv2.circle(show_img, (int(cx + r[idx_left] * np.cos(theta_mark)), int(cy + r[idx_left] * np.sin(theta_mark))), 2, (0, 255, 255), 10)
                 for i, r in enumerate(rho_right):
                     error = np.abs(r - radius_mark)
-                    if min(error) > 20:
-                        continue
+                    # if min(error) > 20:
+                    #     continue
                     idx_right = np.argmin(error)
                     theta_mark = theta_right[i][idx_right]
                     theta_mark_right.append(theta_mark)  # 获取对应的theta值
@@ -574,7 +636,7 @@ class LocateGear:
                 cx, cy, r = circle
                 ci = np.array([keyhole_seg.xyxy_i[0], keyhole_seg.xyxy_i[1]])+np.array([cx, cy])  # 转换为原图坐标系
                 # !:  0139遇到bug
-                if np.linalg.norm(ci - np.array(gear_pos[:2])) > 30:
+                if np.linalg.norm(ci - np.array(gear_pos[:2])) > 50:
                     error.append(1e6)  # 距离过远，认为是错误检测
                     print(f"\033[31mWARNING: Circle detection out of range: {ci} vs {gear_pos[:2]}\033[0m")
                 # 计算误差：距离齿轮位置的距离 + 半径误差
@@ -647,6 +709,17 @@ class ImageProcessor:
         cv2.imshow("Detection Result", show_img)
         cv2.waitKey(waitkey)  # 等待按键事件，0表示无限等待
     
+    def use_radius_split_calib_hole(self, seg_list: List[SegmentResult]) -> Tuple[List[SegmentResult]]:
+        for seg in seg_list:
+                if seg.class_name == Const.ClassInfo.HOLE_CLASS or seg.class_name == Const.ClassInfo.CALIB_CLASS:
+                    x1, y1, x2, y2 = seg.xyxy_i
+                    radius = (x2-x1+y2-y1)/4
+                    if radius > Const.Vision.RADIUS_THRESHOLD:
+                        seg.class_name = Const.ClassInfo.HOLE_CLASS
+                    else:
+                        seg.class_name = Const.ClassInfo.CALIB_CLASS
+        return seg_list
+
     def process_image(self, img: np.ndarray, circle_fit_method: str = 'EdgeDrawing') -> Tuple[Tuple[int, int, float], List[Tuple[int, int, float]], float, Tuple[float, float, float]]:
         '''
         处理单张图像，返回齿轮、孔洞位置和齿轮角度的检测结果
@@ -674,6 +747,10 @@ class ImageProcessor:
             print(f"\033[31m[ERROR] Gear locating failed: {e}\033[0m")
             gear_pos, gear_angle = Const.Gear.ERROR_POS, Const.Gear.ERROR_ANGLE
 
+        # 用半径区分hole和calib hole, hole~140, calibhole~100
+        if Const.Vision.USE_RADIUS_SPLIT_CALIB_HOLE:
+            seg_list = self.use_radius_split_calib_hole(seg_list)
+
         # 处理孔洞检测
         try:
             hole_list = self.hole_locator.locate_hole(
@@ -684,10 +761,17 @@ class ImageProcessor:
             hole_list = []
 
         # 处理标定孔洞检测
+        
+
         try:
-            calib_hole = self.hole_locator.locate_calib_circle(
-                seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method
-            ) if self.hole_locator else (None, None, None)
+            if Const.Vision.USE_CALIB_LIST:
+                calib_hole = self.hole_locator.locate_calib_circle_list(
+                    seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method
+                ) if self.hole_locator else (None, None, None)
+            else:
+                calib_hole = self.hole_locator.locate_calib_circle(
+                    seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method
+                ) if self.hole_locator else (None, None, None)
         except Exception as e:
             print(f"\033[31m[ERROR] Calib hole locating failed: {e}\033[0m")
             calib_hole = (None, None, None)
@@ -718,6 +802,11 @@ class ImageProcessor:
         
         show_img = deepcopy(img) 
         seg_list = self.yolo_predict(img)
+
+        # 用半径区分hole和calib hole, hole~140, calibhole~100
+        if Const.Vision.USE_RADIUS_SPLIT_CALIB_HOLE:
+            seg_list = self.use_radius_split_calib_hole(seg_list)
+        
         assert len(seg_list) > 0, "No valid segment results found"
         # 处理孔洞检测
         hole_list = self.hole_locator.locate_hole(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.hole_locator else []
@@ -735,8 +824,19 @@ class ImageProcessor:
         # 进行YOLO检测
         seg_list = self.yolo_predict(img)
         assert len(seg_list) > 0, "No valid segment results found"
+
+        # 用半径区分hole和calib hole, hole~140, calibhole~100
+        if Const.Vision.USE_RADIUS_SPLIT_CALIB_HOLE:
+            seg_list = self.use_radius_split_calib_hole(seg_list)
+        
+        for seg in seg_list:
+            print(f"Class: {seg.class_name}, Box: {seg.xyxy_i}, Box Height: {seg.xyxy_i[3]-seg.xyxy_i[1]}, Width: {seg.xyxy_i[2]-seg.xyxy_i[0]}")
+
         # 处理标定孔洞检测
-        calib_hole = self.hole_locator.locate_calib_circle(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.hole_locator else (None, None, None)
+        if Const.Vision.USE_CALIB_LIST:
+            calib_hole = self.hole_locator.locate_calib_circle_list(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.hole_locator else (None, None, None)
+        else:
+            calib_hole = self.hole_locator.locate_calib_circle(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.hole_locator else (None, None, None)
 
         if self.show and show_img is not None:
             self._show_img(show_img, waitkey=self.waitkey)

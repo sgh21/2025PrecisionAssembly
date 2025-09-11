@@ -370,7 +370,7 @@ if __name__ == "__main__":
     h, w = image.shape[:2]
     print("Image shape: %s" % str(image.shape))
     print("Image size: Width[%d], Height[%d]" % (w, h))
-    cv2.resizeWindow("image", w//2, h//2)
+    cv2.resizeWindow("image", w//4, h//4)
 
     import time
     while True:
@@ -379,8 +379,9 @@ if __name__ == "__main__":
             print(image.shape)
             height, width = image.shape[:2]
             center_point = (width // 2, height // 2)
-            cv2.circle(image, center_point, radius=5, color=(0, 0, 255), thickness=-1)
-            cv2.imshow("image", image)
+            show_image = image.copy()
+            cv2.circle(show_image, center_point, radius=5, color=(0, 0, 255), thickness=-1)
+            cv2.imshow("image", show_image)
             key = cv2.waitKey(50) & 0xFF
             if key == ord('q'):
                 cv2.destroyAllWindows()

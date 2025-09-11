@@ -1,3 +1,7 @@
+import os, sys
+workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.join(workspace, 'configs'))
+
 from Aubo5i.robotcontrol import *
 from Transform import *
 import copy

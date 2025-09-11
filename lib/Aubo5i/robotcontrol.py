@@ -1,9 +1,12 @@
 #! /usr/bin/env python
 # coding=utf-8
-import os
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '../lib'))
+import os, sys
+lib_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(lib_path)
+# print("lib_path:", lib_path)
+
 import time
+# import libpyauboi5
 import Aubo5i.libpyauboi5 as libpyauboi5
 import logging
 from logging.handlers import RotatingFileHandler
