@@ -303,10 +303,11 @@ class RobotClient:
         init_ori = deepcopy(ROBOT_INIT_ORI)
 
         # 移动到初始位置
-        self.set_robot_mode('stable')
+        self.set_robot_mode('fast')
         self.aubo.movel(init_pos, init_ori, joint=True)
         time.sleep(TIME_SLEEP)  # 等待机械臂稳定
 
+        # self.set_robot_mode('stable')
         if gear_pos is None or gear_angle is None:
             gear_pos, gear_angle = self.move_and_detect(object=GEAR)
 
@@ -326,8 +327,12 @@ class RobotClient:
             use_separate_controller_angle=Const.Robot.SEPARATE_CONTROLLER_INIT_ANGLE  # 不同孔位使用各自的预设控制器角度
         )
 
-        self.set_robot_mode('insert')  # 设置机械臂为插入模式
+        # self.set_robot_mode('fast')
+        waypoint_cnt = 0
         for pos, ori in zip(target_insert_pos_list, target_insert_ori_list):
+            waypoint_cnt += 1
+            if waypoint_cnt == 3:
+                self.set_robot_mode('insert')
             print(f"插入位置: {pos}, 姿态: {ori}")
             self.aubo.movel(pos, ori, joint=False)
             # input("请确认圆孔已插入，按回车键继续.")

@@ -192,8 +192,8 @@ if __name__== "__main__":
     port = Const.Robot.PORT
     joint_maxacc = Const.Robot.JOINT_MAX_ACC
     joint_maxvelc = Const.Robot.JOINT_MAX_VELC
-    end_max_acc = Const.Robot.END_MAX_ACC
-    end_max_velc = Const.Robot.END_MAX_VELC
+    end_max_acc = Const.Robot.END_MAX_ACC/2
+    end_max_velc = Const.Robot.END_MAX_VELC/2
 
     hand_in_eye_offset = Const.Robot.HAND_IN_EYE_OFFSET
 

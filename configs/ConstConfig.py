@@ -11,10 +11,10 @@ class Const:
         IP = '192.168.70.100'
         PORT = 8899
         # INIT_POS = [-0.451483, -0.158571, 0.345734]  # 初始位置 [x, y, z] 单位: m
-        INIT_POS = [-0.451483, -0.06, 0.246410]
-        INIT_ORI = [PI, 0+0.8/180*PI, -PI/2]  # 初始姿态 [roll, pitch, yaw] 单位: rad
-        CALIB_POS = [-0.460314, -0.176025, 0.246410]  # 校准位置 [x, y, z] 单位: m
-        CALIB_ORI = [PI, 0+0.8/180*PI, -PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
+        INIT_POS = [-0.45132782802624044, -0.069000478136698, 0.246410]
+        INIT_ORI = [PI, 0, -PI/2]  # 初始姿态 [roll, pitch, yaw] 单位: rad
+        CALIB_POS = [-0.460314, -0.156025, 0.246410]  # 校准位置 [x, y, z] 单位: m
+        CALIB_ORI = [PI, 0, -PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
         # -0.1148   -0.001547 -0.11437  -0.0015649 
         
         # HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.20] # 手眼标定位置 [x, y, z] 单位: m
@@ -33,12 +33,12 @@ class Const:
         X_OFFSET = 0.11  # 相机X轴偏移量（米） -2.0147132317361707
         POSE_ERROR_THRESHOLD = 5 * 1e-5  # 位置误差阈值（米） 0.05mm
         # CONTROLLER_INIT_ANGLE = 0.8728294 / 180 * PI  # 控制器初始角度，单位：deg
-        HAND_IN_EYE_OFFSET = [-0.09003875, 0.04928324, -0.157]   # 正常标定
+        HAND_IN_EYE_OFFSET = [-0.11364056, 0.00028852, -0.157]   # 正常标定
         # HAND_IN_EYE_OFFSET = [-0.11059811, 0.02624831, -0.157]  # 相机倾斜标定
         # HAND_IN_EYE_OFFSET = [-0.11334386, 0.00293681, -0.157]  # 安装板倾斜标定
 
         SEPARATE_CONTROLLER_INIT_ANGLE = False  # 是否分别使用不同的控制器初始角度
-        CONTROLLER_INIT_ANGLE = -1.70 / 180 * PI
+        CONTROLLER_INIT_ANGLE = -1.20 / 180 * PI
         CONTROLLER_INIT_ANGLE_LIST=[-5.71/180*PI, -1.21/180*PI, 3.29/180*PI, 0, 0, 0]
         STEP = 0.005
         DZ = 0.037
@@ -51,16 +51,16 @@ class Const:
     class Task:
         """任务相关配置"""
         TARGET_HOLE_IDX = 5
-        # TARGET_HOLE_IDX_LIST = [0, 1, 2]  # 目标孔索引列表
-        TARGET_HOLE_IDX_LIST = [3, 4, 5, 0, 1, 2]
+        TARGET_HOLE_IDX_LIST = [0, 1, 2]  # 目标孔索引列表
+        # TARGET_HOLE_IDX_LIST = [3, 4, 5, 0, 1, 2]
         TIME_SLEEP = 1  # 等待机械臂稳定的时间
         WAITKEY = 30  # OpenCV窗口等待时间
 
     class Camera:
         IMG_SHAPE_SHOW = (1024, 1536, 3)
         # 正常标定
-        INTRINSIC_A = [[-0.1898, -13.7862],  # 0.4191 px 0.4256 px
-                       [-13.8241,  0.2230]]
+        INTRINSIC_A = [[-0.1985, -13.7806],  # 0.4191 px 0.4256 px
+                       [-13.8247,  0.2057]]
         # # 相机倾斜
         # INTRINSIC_A = [[-0.1805, -13.8230],  # 0.4191 px 0.4256 px
         #                [-13.8776,  0.2649]]
@@ -93,7 +93,7 @@ class Const:
         N_SLICE_ITERS = 2  # 切片迭代次数
 
         # USE_RADIUS_SPLIT_CALIB_HOLE = True  # 使用半径区分标定圆和hole
-        USE_RADIUS_SPLIT_CALIB_HOLE = False # 运行插孔时关闭此选项
+        USE_RADIUS_SPLIT_CALIB_HOLE = False 
         RADIUS_THRESHOLD = HOLE_RADIUS-1  # 半径阈值，单位：px
         USE_CALIB_LIST = False  # 保留九个标定圆进行位姿计算(不稳定)
 
