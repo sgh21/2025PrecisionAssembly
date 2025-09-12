@@ -167,6 +167,8 @@ class RobotClient:
 
         cnt = 0
         pos_error_threshold = POS_ERROR_THRESHOLD
+        if object == GEAR:
+            pos_error_threshold *= 10
         while pos_error > pos_error_threshold:
             # cnt+=1
             # if cnt >= 5:

@@ -3,3 +3,4 @@ test/
 temp_code/
 documents/
 *.pt
+*.pth

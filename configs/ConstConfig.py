@@ -18,10 +18,10 @@ class Const:
         # -0.1148   -0.001547 -0.11437  -0.0015649 
         
         # HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.20] # 手眼标定位置 [x, y, z] 单位: m
-        JOINT_MAX_ACC = [0.5] * 6
-        JOINT_MAX_VELC = [0.5] * 6
-        END_MAX_ACC = 0.5
-        END_MAX_VELC = 0.5
+        JOINT_MAX_ACC = [0.4] * 6
+        JOINT_MAX_VELC = [0.4] * 6
+        END_MAX_ACC = 0.4
+        END_MAX_VELC = 0.4
         JOINT_STABLE_ACC = [0.15] * 6
         JOINT_STABLE_VELC = [0.15] * 6
         END_STABLE_ACC = 0.15
@@ -33,12 +33,12 @@ class Const:
         X_OFFSET = 0.11  # 相机X轴偏移量（米） -2.0147132317361707
         POSE_ERROR_THRESHOLD = 5 * 1e-5  # 位置误差阈值（米） 0.05mm
         # CONTROLLER_INIT_ANGLE = 0.8728294 / 180 * PI  # 控制器初始角度，单位：deg
-        HAND_IN_EYE_OFFSET = [-0.11364056, 0.00028852, -0.157]   # 正常标定
+        HAND_IN_EYE_OFFSET = [-0.113647, 0.00055901, -0.157]   # 正常标定
         # HAND_IN_EYE_OFFSET = [-0.11059811, 0.02624831, -0.157]  # 相机倾斜标定
         # HAND_IN_EYE_OFFSET = [-0.11334386, 0.00293681, -0.157]  # 安装板倾斜标定
 
         SEPARATE_CONTROLLER_INIT_ANGLE = False  # 是否分别使用不同的控制器初始角度
-        CONTROLLER_INIT_ANGLE = -1.20 / 180 * PI
+        CONTROLLER_INIT_ANGLE = -0.66 / 180 * PI
         CONTROLLER_INIT_ANGLE_LIST=[-5.71/180*PI, -1.21/180*PI, 3.29/180*PI, 0, 0, 0]
         STEP = 0.005
         DZ = 0.037
@@ -51,16 +51,16 @@ class Const:
     class Task:
         """任务相关配置"""
         TARGET_HOLE_IDX = 5
-        TARGET_HOLE_IDX_LIST = [0, 1, 2]  # 目标孔索引列表
-        # TARGET_HOLE_IDX_LIST = [3, 4, 5, 0, 1, 2]
+        # TARGET_HOLE_IDX_LIST = [0, 1, 2]  # 目标孔索引列表
+        TARGET_HOLE_IDX_LIST = [3, 4, 5, 0, 1, 2]
         TIME_SLEEP = 1  # 等待机械臂稳定的时间
         WAITKEY = 30  # OpenCV窗口等待时间
 
     class Camera:
         IMG_SHAPE_SHOW = (1024, 1536, 3)
         # 正常标定
-        INTRINSIC_A = [[-0.1985, -13.7806],  # 0.4191 px 0.4256 px
-                       [-13.8247,  0.2057]]
+        INTRINSIC_A = [[-0.1585, -13.7798],  # 0.4191 px 0.4256 px
+                       [-13.8141,  0.2142]]
         # # 相机倾斜
         # INTRINSIC_A = [[-0.1805, -13.8230],  # 0.4191 px 0.4256 px
         #                [-13.8776,  0.2649]]
@@ -109,6 +109,13 @@ class Const:
         # YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0819.pt'
         YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0910.pt'
         YOLO_CONF = 0.8  # YOLO检测置信度阈值
+    
+    class Sam:
+        MODEL_DIR = r'./models'
+        SAM_MODEL_TYPE = 'vit_h'  # vit_b vit_h
+        SAM_WEIGHTS = 'sam_vit_h_4b8939.pth'
+        # SAM_WEIGHTS = 'sam_vit_b_01ec64.pth'
+        SAM_CONF = 0.5  # SAM检测置信度阈值
 
     class Data:
         DATASET_DIR = r'./documents'
@@ -144,8 +151,12 @@ class SegmentResult:
         self.radius = None      # 半径，待计算
         self.angle = None       # 角度，待计算
         self.img_i = img
-        self.class_id = class_id
-        self.class_name = list(self.class_dict.keys())[class_id]
+        if type(class_id) == int:
+            self.class_id = class_id
+            self.class_name = list(self.class_dict.keys())[class_id]
+        elif type(class_id) == str:
+            self.class_name = class_id
+            # self.class_id = self.class_dict[class_id]
         self.box_i = box
         self.mask = mask
         self._cut_pic_with_box(padding = Const.Vision.CUT_PADDING)  # 根据边界框裁剪图片
