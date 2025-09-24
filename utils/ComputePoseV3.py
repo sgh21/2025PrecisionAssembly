@@ -1,7 +1,8 @@
 '''
-使用SAM实现的ComputePose
+综合使用YOLO和SAM实现的ComputePose
+TODO:筛选hole的策略更新为到齿轮中心最近的六个并过滤距离的离群值
 '''
-
+from ultralytics import YOLO
 from segment_anything import sam_model_registry, SamPredictor
 
 import numpy as np
@@ -584,6 +585,8 @@ class LocateGear:
 
         return theta_mean
     
+    
+    
     def locate_gear(self, 
                     seg_list:List[SegmentResult], 
                     show_img: np.ndarray = None, 
@@ -667,10 +670,35 @@ class LocateGear:
             x2 = int(cx + r * np.cos(angle) * 4)
             y2 = int(cy + r * np.sin(angle) * 4)
             cv2.line(show_img, (cx, cy), (x2, y2), (0, 255, 255), 3)
+            # 显示分割掩码
+            def visualize_mask(image, mask, color=(0,255,0)):
+                """可视化SAM分割结果"""
+                # result = image.copy()
+                mask = mask.astype(bool)
+                print(f"#####################{np.count_nonzero(mask)/mask.size}#####################")
+                # 创建彩色掩码覆盖层
+                colored_mask = np.zeros_like(image)
+                colored_mask[mask] = list(color)  # 绿色掩码
+                # 添加半透明掩码覆盖
+                image = cv2.addWeighted(image, 0.7, colored_mask, 0.3, 0)
+                # 绘制掩码轮廓
+                mask_uint8 = (mask * 255).astype(np.uint8)
+                contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cv2.drawContours(image, contours, -1, color, 5)
+                return image
+            show_img = visualize_mask(show_img, gear_seg.mask)
+            show_img = visualize_mask(show_img, keyhole_seg.mask, color=(255,0,0))
+            cv2.putText(show_img, f"Gear Angle: {gear_angle*180/np.pi:.1f} deg", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 0, 0), 2)
+            cv2.putText(show_img, f"Gear Pos: ({gear_pos[0]}, {gear_pos[1]})", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 0, 0), 2)
+
+            cv2.imshow("Gear Detection", cv2.resize(show_img,(640,480)))
+            cv2.waitKey(10)  # 等待按键事件，0表示无限等待
+
         return gear_pos, gear_angle
 
 class ImageProcessor:
-    def __init__(self, device: str, model_weights: str, model_type: str, show: bool = False, waitkey: int = 100):
+    def __init__(self, device: str, yolo_model_weights: str, model_weights: str, model_type: str, show: bool = False, waitkey: int = 100):
+        self.yolo_model = YOLO(yolo_model_weights)
         self.model = SamPredictor(sam_model_registry[model_type](checkpoint=model_weights).to(device))
         self.show = show
         self.waitkey = waitkey
@@ -678,7 +706,7 @@ class ImageProcessor:
         self.hole_locator = LocateHole()
     
     def yolo_predict(self, img: np.ndarray) -> List[SegmentResult]:
-        results = self.model.predict(img, retina_masks = True, conf = Const.Yolo.YOLO_CONF)
+        results = self.yolo_model.predict(img, retina_masks = True, conf = Const.Yolo.YOLO_CONF)
         if len(results) == 0 or results[0].masks==None:
             print("No valid detection results found.")
             return Const.Gear.ERROR_POS+(0,), [], Const.Gear.ERROR_ANGLE, None
@@ -706,7 +734,75 @@ class ImageProcessor:
             ))
         return seg_list
     
-    def visualize_sam_result(self, image, mask):
+    def yolo_sam_predict(self, img: np.ndarray) -> List[SegmentResult]:
+        '''
+        用于检测齿轮位置，有线使用yolo，在检测失效情况下使用sam辅助检测
+        '''
+        results = self.yolo_model.predict(img, retina_masks = True, conf = Const.Yolo.YOLO_CONF)
+        if len(results) == 0 or results[0].masks==None:
+            print("No valid detection results found.")
+            return Const.Gear.ERROR_POS+(0,), [], Const.Gear.ERROR_ANGLE, None
+        
+        if self.show:
+            img_show = results[0].plot()  # 获取可视化结果
+            cv2.namedWindow("YOLO Result", cv2.WINDOW_NORMAL)
+            cv2.resizeWindow("YOLO Result", Const.Camera.IMG_SHAPE_SHOW[1], Const.Camera.IMG_SHAPE_SHOW[0])  # 你想要的尺寸
+            cv2.imshow("YOLO Result", img_show)
+            cv2.waitKey(self.waitkey)  # 等待按键事件，0表示无限等待
+
+        boxes = results[0].boxes.xyxy.cpu().numpy()
+        masks = results[0].masks.data.cpu().numpy()
+        classes = results[0].boxes.cls.cpu().numpy().astype(int)
+        seg_list:List[SegmentResult] = []
+        for i in range(len(boxes)):
+            # 创建SegmentResult对象 
+            # 每个对象会根据yolo检测结果进行裁剪 local_img_i
+            # 并分别根据局部图像和原图像进行边缘检测 
+            seg_list.append(SegmentResult(
+                img = img,
+                class_id = classes[i].item(),
+                box = boxes[i],
+                mask = masks[i]
+            ))
+            
+            ### 测试SAM对keyhole分割效果
+            if seg_list[-1].class_name == Const.ClassInfo.KEYHOLE_CLASS:
+                seg_list.pop()  # 删除yolo检测到的keyhole
+            ###
+        has_gear = any([seg.class_name == Const.ClassInfo.GEAR_CLASS for seg in seg_list])
+        has_keyhole = any([seg.class_name == Const.ClassInfo.KEYHOLE_CLASS for seg in seg_list])
+        if has_gear and not has_keyhole:
+            gear_seg = [seg for seg in seg_list if seg.class_name == Const.ClassInfo.GEAR_CLASS][0]
+            x1, y1, x2, y2 = gear_seg.xyxy_i
+            center = [(x1+x2)/2, (y1+y2)/2]  # 中心点
+            radius_a = (x2-x1+y2-y1)/4 # 齿顶半径估计值
+            radius_mark = radius_a /60*13 #SAM标记点的半径估计值
+            mark_points = []
+            for angle in [0, np.pi/3, 2*np.pi/3, np.pi, 4*np.pi/3, 5*np.pi/3]:
+                px = int(center[0] + radius_mark * np.cos(angle))
+                py = int(center[1] + radius_mark * np.sin(angle))
+                mark_points.append((px, py))  # 1表示前景点
+            point_coords = np.array(mark_points)
+            point_labels = np.array([1]*len(mark_points))  # 1 for foreground
+            self.model.set_image(img)
+            masks, scores, logits = self.model.predict(
+                point_coords=point_coords,
+                point_labels=point_labels,
+                multimask_output=False,
+            )
+            mask = masks[0]
+            box = np.array([np.min(np.where(mask)[1]), np.min(np.where(mask)[0]), np.max(np.where(mask)[1]), np.max(np.where(mask)[0])])  # x1, y1, x2, y2
+            seg_list.append(SegmentResult(
+                img=img,
+                class_id=Const.ClassInfo.KEYHOLE_CLASS,
+                box=box,
+                mask=mask
+            ))
+            
+
+        return seg_list
+    
+    def visualize_sam_result(self, image, box, mask):
         """可视化SAM分割结果"""
         result = image.copy()
         
@@ -786,7 +882,7 @@ class ImageProcessor:
         '''
         show_img = deepcopy(img) 
         # 进行YOLO检测
-        seg_list = self.yolo_predict(img)
+        seg_list = self.yolo_sam_predict(img)
         assert len(seg_list) > 0, "No valid segment results found"
 
         # 处理齿轮检测
@@ -834,12 +930,11 @@ class ImageProcessor:
     
     def detect_gear(self,
                     img: np.ndarray,
-                    circle_fit_method: str = 'EdgeDrawing',
-                    mark_points: List[Tuple[int, int, int]]=[]) -> Tuple[Tuple[int, int, float], float]:
+                    circle_fit_method: str = 'EdgeDrawing') -> Tuple[Tuple[int, int, float], float]:
         """ 检测齿轮位置和角度 """
 
         show_img = deepcopy(img) 
-        seg_list = self.sam_predict(img, mark_points=mark_points, class_ids=[Const.ClassInfo.KEYHOLE_CLASS, Const.ClassInfo.GEAR_CLASS])
+        seg_list = self.yolo_sam_predict(img)
         
         assert len(seg_list) > 0, "No valid segment results found"
         # 处理齿轮检测
@@ -851,11 +946,10 @@ class ImageProcessor:
     
     def detect_hole(self, 
                     img: np.ndarray, 
-                    circle_fit_method: str = 'EdgeDrawing',
-                    mark_points: List[Tuple[int, int, int]]=[]) -> List[Tuple[int, int, float]]:
+                    circle_fit_method: str = 'EdgeDrawing') -> List[Tuple[int, int, float]]:
 
         show_img = deepcopy(img) 
-        seg_list = self.sam_predict(img, mark_points=mark_points, class_ids=[Const.ClassInfo.HOLE_CLASS]*len(mark_points))
+        seg_list = self.yolo_predict(img)
 
         # 用半径区分hole和calib hole, hole~140, calibhole~100
         if Const.Vision.USE_RADIUS_SPLIT_CALIB_HOLE:

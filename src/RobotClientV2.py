@@ -34,6 +34,7 @@ INTRINSIC_A = Const.Camera.INTRINSIC_A
 ROBOT_INIT_POS = Const.Robot.INIT_POS
 ROBOT_INIT_ORI = Const.Robot.INIT_ORI
 HAND_IN_EYE_OFFSET = Const.Robot.HAND_IN_EYE_OFFSET
+HAND_IN_EYE_OFFSET_LIST = Const.Robot.HAND_IN_EYE_OFFSET_LIST
 CONTROLLER_INIT_ANGLE = Const.Robot.CONTROLLER_INIT_ANGLE  
 CONTROLLER_INIT_ANGLE_LIST = Const.Robot.CONTROLLER_INIT_ANGLE_LIST
 
@@ -262,7 +263,12 @@ class RobotClient:
         print(f"使用预设控制器角度: {controller_init_angle*180/np.pi:.2f} deg")
 
         delta_controller_angle = controller_init_angle - controller_angle
-        target_insert_pos = np.array(target_pos) +np.array(HAND_IN_EYE_OFFSET) 
+
+        if Const.Robot.USE_SEPARATE_HAND_IN_EYE_OFFSET:
+            hand_in_eye_offset = HAND_IN_EYE_OFFSET_LIST[target_hole_idx]
+        else:
+            hand_in_eye_offset = HAND_IN_EYE_OFFSET
+        target_insert_pos = np.array(target_pos) +np.array(hand_in_eye_offset) 
         target_insert_ori = np.array(target_ori) + np.array([0, 0, delta_controller_angle])
 
         target_insert_pos_list = []
