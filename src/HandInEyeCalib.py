@@ -56,12 +56,14 @@ class HandInEyeCalibClient(RobotClient):
             insert_pos = deepcopy(current_waypoint['pos'])
             init_pos = current_waypoint['pos']
             init_ori = quaternion_standard2rpy(current_waypoint['ori'])
-            init_pos[0] += X_OFFSET  # 假设相机在机械臂末端前方0.11米
-            init_pos[2] = ROBOT_INIT_POS[2]  # 确保Z轴位置正确
             
             # 移动到初始位置
             self.set_robot_mode('stable')
+            init_pos[2] = ROBOT_INIT_POS[2]  # 确保Z轴位置正确
+            self.aubo.movel(init_pos, init_ori)
+            init_pos[0] += X_OFFSET  # 假设相机在机械臂末端前方0.11米
             self.aubo.movel(init_pos, init_ori, joint=True)
+
             time.sleep(TIME_SLEEP)
             
             # 使用父类的move_and_detect方法精确定位到圆孔
@@ -221,7 +223,8 @@ def main():
     except Exception as e:
         print(f"程序执行过程中发生错误: {e}")
     finally:
-        calib_client.aubo.movel(pos=real_hole_pos, ori=Const.Robot.INIT_ORI, joint=True)
+        real_hole_pos[2] = ROBOT_INIT_POS[2]  # 确保Z轴位置正确
+        calib_client.aubo.movel(pos=real_hole_pos, ori=Const.Robot.INIT_ORI)
         # 清理资源（继承自RobotClient的disconnect方法）
         calib_client.disconnect()
         cv2.destroyAllWindows()

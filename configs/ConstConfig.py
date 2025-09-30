@@ -8,50 +8,56 @@ class Const:
 
     class Robot:
         """机器人相关配置"""
-        IP = '192.168.1.100'
+        # IP = '192.168.1.100'
+        IP = '192.168.70.10'
         PORT = 8899
-        # INIT_POS = [-0.451483, -0.158571, 0.345734]  # 初始位置 [x, y, z] 单位: m
-        INIT_POS = [0.48657, 0.01178, 0.236420]
-        INIT_ORI = [PI, 0, PI/2]  # 初始姿态 [roll, pitch, yaw] 单位: rad
-        CALIB_POS = [0.48885, -0.079199, 0.236420]  # 校准位置 [x, y, z] 单位: m
-        CALIB_ORI = [PI, 0, PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
-        # -0.1148   -0.001547 -0.11437  -0.0015649 
+        # INIT_POS = [0.48657, 0.01178, 0.236420]
+        # INIT_ORI = [PI, 0, PI/2]  # 初始姿态 [roll, pitch, yaw] 单位: rad
+        # CALIB_POS = [0.48885, -0.079199, 0.236420]  # 校准位置 [x, y, z] 单位: m
+        # CALIB_ORI = [PI, 0, PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
+
+        INIT_POS = [-0.477483, -0.068571, 0.236420]  # 初始位置 [x, y, z] 单位: m
+        INIT_ORI = [PI, 0, -PI/2]  # 初始姿态 [roll, pitch, yaw] 单位: rad
+        CALIB_POS = [-0.48885, -0.1579199, 0.236420]
+        CALIB_ORI = [PI, 0, -PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
         
         # HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.20] # 手眼标定位置 [x, y, z] 单位: m
         JOINT_MAX_ACC = [0.15] * 6
         JOINT_MAX_VELC = [0.15] * 6
-        END_MAX_ACC = 0.15
-        END_MAX_VELC = 0.15
-        JOINT_STABLE_ACC = [0.15] * 6
-        JOINT_STABLE_VELC = [0.15] * 6
-        END_STABLE_ACC = 0.15
-        END_STABLE_VELC = 0.15
+        END_MAX_ACC = 0.10
+        END_MAX_VELC = 0.10
+        JOINT_STABLE_ACC = [0.10] * 6
+        JOINT_STABLE_VELC = [0.10] * 6
+        END_STABLE_ACC = 0.10
+        END_STABLE_VELC = 0.10
         JOINT_INSERT_ACC = [0.02] * 6  # 插入时的关节最大加速度
         JOINT_INSERT_VELC = [0.02] * 6
-        END_INSERT_ACC = 0.2  # 插入时的末端最大加速度
+        END_INSERT_ACC = 0.02  # 插入时的末端最大加速度
         END_INSERT_VELC = 0.02
-        X_OFFSET = -0.11  # 相机X轴偏移量（米） -2.0147132317361707
         POSE_ERROR_THRESHOLD = 5 * 1e-5  # 位置误差阈值（米） 0.05mm
         # CONTROLLER_INIT_ANGLE = 0.8728294 / 180 * PI  # 控制器初始角度，单位：deg
-        USE_SEPARATE_HAND_IN_EYE_OFFSET = False
-        # HAND_IN_EYE_OFFSET = [0.109645, 0.00085254, -0.157]   # 正常标定
-        HAND_IN_EYE_OFFSET = [0.10967375, 0.00199195, -0.155]
+        USE_SEPARATE_HAND_IN_EYE_OFFSET = True # 每个孔使用各自的手眼标定结果
+        # 比赛
+        # X_OFFSET = -0.11  # 相机X轴偏移量（米） -2.0147132317361707
+        # HAND_IN_EYE_OFFSET = [0.10967375, 0.00199195, -0.155]
+        # 实验室
+        X_OFFSET = 0.11  # 相机X轴偏移量（米） -2.0147132317361707
+        HAND_IN_EYE_OFFSET = [-0.11344396, 0.00027828, -0.150]
         HAND_IN_EYE_OFFSET_LIST = [
-            [],
-            [],
-            [],
-            [0.10961375, -0.00101095, -0.155],
-            [0.10961375, -0.00101095, -0.155],
-            [0.109241375, -0.00096883, -0.155]
+            [-0.11341275, 0.00023554, -0.150],
+            [-0.113275, 0.00025307, -0.150],
+            [-0.11342842, 0.0002757, -0.150],
+            [-0.11342842, -0.0002757, -0.150],
+            [-0.11342842, -0.0002757, -0.150],
+            [-0.11342842, -0.0002757, -0.150]
         ]
-        # HAND_IN_EYE_OFFSET = [-0.11059811, 0.02624831, -0.157]  # 相机倾斜标定
-        # HAND_IN_EYE_OFFSET = [-0.11334386, 0.00293681, -0.157]  # 安装板倾斜标定
+
 
         SEPARATE_CONTROLLER_INIT_ANGLE = False  # 是否分别使用不同的控制器初始角度
-        CONTROLLER_INIT_ANGLE = -6.0 / 180 * PI
+        CONTROLLER_INIT_ANGLE = -0.15 / 180 * PI
         CONTROLLER_INIT_ANGLE_LIST=[-5.71/180*PI, -1.21/180*PI, 3.29/180*PI, 0, 0, 0]
         STEP = 0.005
-        DZ = 0.037
+        DZ = 0.04
         # # 考虑板和相机的倾斜
         # INCLINE = False     # 是否考虑安装板和相机倾斜
         # T_camera2flange = None  # TODO:尚未完成标定
@@ -61,23 +67,21 @@ class Const:
     class Task:
         """任务相关配置"""
         TARGET_HOLE_IDX = 5
-        # TARGET_HOLE_IDX_LIST = [0, 1, 2]  # 目标孔索引列表
+        TARGET_HOLE_IDX_LIST = [0, 1, 2]  # 目标孔索引列表
         # TARGET_HOLE_IDX_LIST = [ 0, 1, 2, 3, 4, 5]
-        TARGET_HOLE_IDX_LIST = [3, 4, 5]
-        TIME_SLEEP = 1  # 等待机械臂稳定的时间
+        # TARGET_HOLE_IDX_LIST = [2,2,2]
+        TIME_SLEEP = 2  # 等待机械臂稳定的时间
         WAITKEY = 30  # OpenCV窗口等待时间
 
     class Camera:
         IMG_SHAPE_SHOW = (1024, 1536, 3)
-        # 正常标定
-        INTRINSIC_A = [[-0.2816, 14.0124],  # 0.4191 px 0.4256 px
-                       [13.9848,  0.3358]]
-        # # 相机倾斜
-        # INTRINSIC_A = [[-0.1805, -13.8230],  # 0.4191 px 0.4256 px
-        #                [-13.8776,  0.2649]]
-        # # 安装版倾斜
-        # INTRINSIC_A = [[-0.1946, -13.7809],  # 0.4191 px 0.4256 px
-        #                [-13.8243,  0.2401]]
+        # 比赛
+        # INTRINSIC_A = [[-0.2816, 14.0124],  # 0.4191 px 0.4256 px
+        #                [13.9848,  0.3358]]
+        # 实验室
+        INTRINSIC_A = [[-0.1842, -14.3617],  # 0.4191 px 0.4256 px
+                       [-14.3878,  0.2278]]
+
         INTRINSIC_U0 = [1536, 1024]
         
 
@@ -110,15 +114,17 @@ class Const:
 
     class Gear:
         Z = 18
+        PEAK_RADIUS = 60  # 齿顶圆半径，单位：mm
+        KEYHOLE_MARK_RADIUS = 11    # SAM标记点所在圆的半径，单位：mm
         PRESSURE_ANGLE = 20/180*PI
         ERROR_POS = (0,0)
         ERROR_ANGLE = -1
 
     class Yolo:
         MODEL_DIR = r'./models'
-        # YOLO_CIRCLE_WEIGHTS = 'yolov8-circle.pt'
         # YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0819.pt'
         YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0910.pt'
+        YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0914-200.pt'
         YOLO_CONF = 0.8  # YOLO检测置信度阈值
     
     class Sam:
@@ -143,6 +149,13 @@ class Const:
             HOLE_CLASS: 1,
             GEAR_CLASS: 2,
             CALIB_CLASS: 3,
+        }
+        
+        CLASS_NAME_DICT = {
+            0: KEYHOLE_CLASS,
+            1: HOLE_CLASS,
+            2: GEAR_CLASS,
+            3: CALIB_CLASS,
         }
         COLOR_LIST = [
             [255, 0, 0],

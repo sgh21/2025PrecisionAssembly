@@ -349,7 +349,7 @@ class LocateHole:
                 cv2.circle(show_img, (int(cx), int(cy)), int(r), (0, 255, 0), 2)
                 cv2.putText(show_img, str(i), (int(cx), int(cy)), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 2)
         
-        return hole_list
+        return hole_list, show_img
     
 
     def locate_calib_circle_list(self,
@@ -488,9 +488,11 @@ class LocateGear:
                                     seg:SegmentResult,
                                     show_img: np.ndarray = None,
                                     mask_edge: bool = True) -> float:
-        '''计算齿轮的旋转角度
+        '''计算齿轮的旋转角度，使用两侧渐开线上截取点的方法
         返回：范围 [0, 2*pi/z]
         '''
+        def gear_angle_normalize(angle, tooth_range):
+            return angle % tooth_range
         if seg.class_name != "gear":
             return None
         if mask_edge:
@@ -509,7 +511,7 @@ class LocateGear:
         # print(f"rho range: {np.min(rho)} to {np.max(rho)}")
         tooth_height = (np.max(rho) - np.min(rho))          # 齿高
         radius_pitch = (np.max(rho) + np.min(rho)) / 2      # 分度圆半径
-        radius_base = radius_pitch * np.cos(Const.Gear.PRESSURE_ANGLE)    # 基圆半径
+        # radius_base = radius_pitch * np.cos(Const.Gear.PRESSURE_ANGLE)    # 基圆半径
 
         # 方法：将每个齿切成两半，2z段分别寻找最接近radius_mark的点
         # 找到最大rho所在theta
@@ -521,7 +523,7 @@ class LocateGear:
             if i == 0:
                 theta_ini = theta_valley
             else:
-                theta_ini = theta_mean - tooth_range/2
+                theta_ini = theta_res - tooth_range/2
             # 根据齿轮齿数，将theta切分成z个部分
             theta_left, theta_right = [], []
             rho_left, rho_right = [], []
@@ -555,7 +557,7 @@ class LocateGear:
                     idx_left = np.argmin(error)  # 找到最接近radius_mark的点
                     theta_mark = theta_left[i][idx_left]
                     theta_mark_left.append(theta_mark)  # 获取对应的theta值
-                    cv2.circle(show_img, (int(cx + r[idx_left] * np.cos(theta_mark)), int(cy + r[idx_left] * np.sin(theta_mark))), 2, (0, 255, 255), 10)
+                    cv2.circle(show_img, (int(cx + r[idx_left] * np.cos(theta_mark)), int(cy + r[idx_left] * np.sin(theta_mark))), 2, (255, 0, 255), 10)
                 for i, r in enumerate(rho_right):
                     error = np.abs(r - radius_mark)
                     # if min(error) > 20:
@@ -563,7 +565,7 @@ class LocateGear:
                     idx_right = np.argmin(error)
                     theta_mark = theta_right[i][idx_right]
                     theta_mark_right.append(theta_mark)  # 获取对应的theta值
-                    cv2.circle(show_img, (int(cx + r[idx_right] * np.cos(theta_mark)), int(cy + r[idx_right] * np.sin(theta_mark))), 2, (0, 255, 255), 10)
+                    cv2.circle(show_img, (int(cx + r[idx_right] * np.cos(theta_mark)), int(cy + r[idx_right] * np.sin(theta_mark))), 2, (255, 0, 255), 10)
             
             # 归一化到单齿范围
             offset = theta_ini
@@ -581,9 +583,25 @@ class LocateGear:
             theta_mean_right = np.mean(regularized_theta_right)
             if theta_mean_left < theta_mean_right:
                 theta_mean_left += tooth_range  # 确保左半齿的平均角度大于右半齿
-            theta_mean = np.mod((theta_mean_left + theta_mean_right) / 2 + offset, tooth_range) # 计算整体平均角度
+            theta_res = np.mod((theta_mean_left + theta_mean_right) / 2 + offset, tooth_range) # 计算整体平均角度
+        
+        # 检查检测结果是齿顶还是齿根，如果检测成齿根，则+齿轮半齿角度
+        theta_peak = [theta_res+i*tooth_range for i in range(0, Const.Gear.Z)] # 当前输出（认为是齿顶）的角度对应的18个齿顶角度
+        if theta_res > tooth_range/2:
+            theta_valley = [theta_res-tooth_range/2+i*tooth_range for i in range(0, Const.Gear.Z)]
+        else:
+            theta_valley = [theta_res+tooth_range/2+i*tooth_range for i in range(0, Const.Gear.Z)]
+        peak_radius_sum, valley_radius_sum = 0, 0
+        for t in theta_peak:
+            idx = np.argmin(np.abs(theta - t))
+            peak_radius_sum += rho[idx]
+        for t in theta_valley:
+            idx = np.argmin(np.abs(theta - t))
+            valley_radius_sum += rho[idx]
+        if valley_radius_sum > peak_radius_sum:   # 如果检测出的齿顶半径比齿根半径小，则切换
+            theta_res = gear_angle_normalize(theta_res + tooth_range/2, tooth_range)
 
-        return theta_mean
+        return theta_res
     
     
     
@@ -594,16 +612,11 @@ class LocateGear:
         """
         处理齿轮检测结果，返回齿轮位置和角度 px, rad
         """
-        # !: 为何叫error_pos和error_angle？
+
         gear_pos = Const.Gear.ERROR_POS+(0,) # 齿轮位置，原图坐标系，默认值(0,0)
         gear_angle = Const.Gear.ERROR_ANGLE   # 范围 [0, 2*pi/z]，默认值-1
-        gear_list = []
-        keyhole_list = []
-        for seg in seg_list:
-            if seg.class_name == Const.ClassInfo.GEAR_CLASS:
-                gear_list.append(seg)
-            elif seg.class_name == Const.ClassInfo.KEYHOLE_CLASS:
-                keyhole_list.append(seg)
+        gear_list = [seg for seg in seg_list if seg.class_name == Const.ClassInfo.GEAR_CLASS]
+        keyhole_list = [seg for seg in seg_list if seg.class_name == Const.ClassInfo.KEYHOLE_CLASS]
         print(f"Detected {len(gear_list)} gears, {len(keyhole_list)} keyholes.")
         
         '''1. 计算齿轮的位置'''
@@ -643,10 +656,10 @@ class LocateGear:
             for circle in circles:
                 cx, cy, r = circle
                 ci = np.array([keyhole_seg.xyxy_i[0], keyhole_seg.xyxy_i[1]])+np.array([cx, cy])  # 转换为原图坐标系
-                # !:  0139遇到bug
-                if np.linalg.norm(ci - np.array(gear_pos[:2])) > 50:
-                    error.append(1e6)  # 距离过远，认为是错误检测
-                    print(f"\033[31mWARNING: Circle detection out of range: {ci} vs {gear_pos[:2]}\033[0m")
+                # # !:  0139遇到bug
+                # if np.linalg.norm(ci - np.array(gear_pos[:2])) > 50:
+                #     error.append(1e6)  # 距离过远，认为是错误检测
+                #     print(f"\033[31mWARNING: Circle detection out of range: {ci} vs {gear_pos[:2]}\033[0m")
                 # 计算误差：距离齿轮位置的距离 + 半径误差
                 # 这里的10是一个权重系数，可以根据实际情况调整
                 error.append(10*np.linalg.norm(ci - np.array(gear_pos[:2]))+abs(r+10 - gear_pos[2]))
@@ -669,32 +682,31 @@ class LocateGear:
             angle = gear_angle  # 单位: 弧度
             x2 = int(cx + r * np.cos(angle) * 4)
             y2 = int(cy + r * np.sin(angle) * 4)
-            cv2.line(show_img, (cx, cy), (x2, y2), (0, 255, 255), 3)
+            cv2.line(show_img, (cx, cy), (x2, y2), (255, 0, 255), 3)
             # 显示分割掩码
-            def visualize_mask(image, mask, color=(0,255,0)):
+            def visualize_mask(image, mask, color=(0,255,0), contour_only=False):
                 """可视化SAM分割结果"""
-                # result = image.copy()
                 mask = mask.astype(bool)
-                print(f"#####################{np.count_nonzero(mask)/mask.size}#####################")
-                # 创建彩色掩码覆盖层
-                colored_mask = np.zeros_like(image)
-                colored_mask[mask] = list(color)  # 绿色掩码
-                # 添加半透明掩码覆盖
-                image = cv2.addWeighted(image, 0.7, colored_mask, 0.3, 0)
+                if contour_only:
+                    # print(f"#####################{np.count_nonzero(mask)/mask.size}#####################")
+                    # 创建彩色掩码覆盖层
+                    colored_mask = np.zeros_like(image)
+                    colored_mask[mask] = list(color)  # 绿色掩码
+                    # 添加半透明掩码覆盖
+                    image = cv2.addWeighted(image, 0.7, colored_mask, 0.3, 0)
                 # 绘制掩码轮廓
                 mask_uint8 = (mask * 255).astype(np.uint8)
                 contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                 cv2.drawContours(image, contours, -1, color, 5)
                 return image
-            show_img = visualize_mask(show_img, gear_seg.mask)
-            show_img = visualize_mask(show_img, keyhole_seg.mask, color=(255,0,0))
+
+            show_img = visualize_mask(show_img, gear_seg.mask, contour_only=False)
+            show_img = visualize_mask(show_img, keyhole_seg.mask, color=(255,0,0), contour_only=False)
             cv2.putText(show_img, f"Gear Angle: {gear_angle*180/np.pi:.1f} deg", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 0, 0), 2)
             cv2.putText(show_img, f"Gear Pos: ({gear_pos[0]}, {gear_pos[1]})", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 0, 0), 2)
 
-            cv2.imshow("Gear Detection", cv2.resize(show_img,(640,480)))
-            cv2.waitKey(10)  # 等待按键事件，0表示无限等待
 
-        return gear_pos, gear_angle
+        return gear_pos, gear_angle, show_img
 
 class ImageProcessor:
     def __init__(self, device: str, yolo_model_weights: str, model_weights: str, model_type: str, show: bool = False, waitkey: int = 100):
@@ -776,7 +788,7 @@ class ImageProcessor:
             x1, y1, x2, y2 = gear_seg.xyxy_i
             center = [(x1+x2)/2, (y1+y2)/2]  # 中心点
             radius_a = (x2-x1+y2-y1)/4 # 齿顶半径估计值
-            radius_mark = radius_a /60*13 #SAM标记点的半径估计值
+            radius_mark = radius_a / Const.Gear.PEAK_RADIUS * Const.Gear.KEYHOLE_MARK_RADIUS #SAM标记点的半径估计值
             mark_points = []
             for angle in [0, np.pi/3, 2*np.pi/3, np.pi, 4*np.pi/3, 5*np.pi/3]:
                 px = int(center[0] + radius_mark * np.cos(angle))
@@ -800,7 +812,7 @@ class ImageProcessor:
             ))
             
 
-        return seg_list
+        return seg_list, mark_points
     
     def visualize_sam_result(self, image, box, mask):
         """可视化SAM分割结果"""
@@ -811,8 +823,8 @@ class ImageProcessor:
         colored_mask[mask] = [0, 255, 0]  # 绿色掩码
         
         # 添加半透明掩码覆盖
-        result = cv2.addWeighted(result, 0.7, colored_mask, 0.3, 0)
-        
+        result = np.where(mask == 1, result * 0.9 + colored_mask[mask] * 0.1, result)
+
         # 绘制掩码轮廓
         mask_uint8 = (mask * 255).astype(np.uint8)
         contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -845,7 +857,6 @@ class ImageProcessor:
             img_res = self.visualize_sam_result(img, box, mask)
             img_res = cv2.resize(img_res, (Const.Camera.IMG_SHAPE_SHOW[1]//2, Const.Camera.IMG_SHAPE_SHOW[0]//2))
             cv2.imshow("SAM Result", img_res)
-            cv2.waitKey(300)
         return seg_list
     
     @ staticmethod
@@ -882,34 +893,41 @@ class ImageProcessor:
         '''
         show_img = deepcopy(img) 
         # 进行YOLO检测
-        seg_list = self.yolo_sam_predict(img)
+        seg_list, mark_points = self.yolo_sam_predict(img)
+        for mark in mark_points:
+            cv2.circle(show_img, (mark[0], mark[1]), 5, (0, 255, 0), -1)
+
+        gear_num = sum([1 for seg in seg_list if seg.class_name == Const.ClassInfo.GEAR_CLASS])
+        keyhole_num = sum([1 for seg in seg_list if seg.class_name == Const.ClassInfo.KEYHOLE_CLASS])
+        hole_num = sum([1 for seg in seg_list if seg.class_name == Const.ClassInfo.HOLE_CLASS])
+        calib_num = sum([1 for seg in seg_list if seg.class_name == Const.ClassInfo.CALIB_CLASS])
+        print(f"Detected {gear_num} gears, {keyhole_num} keyholes, {hole_num} holes, {calib_num} calib holes.")
+        cv2.putText(show_img, f"Detected {gear_num} gears, {keyhole_num} keyholes, {hole_num} holes, {calib_num} calib holes.", (120, 140), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 0, 0), 5)
+
         assert len(seg_list) > 0, "No valid segment results found"
+
+
 
         # 处理齿轮检测
         try:
-            gear_pos, gear_angle = self.gear_locator.locate_gear(
+            gear_pos, gear_angle, show_img = self.gear_locator.locate_gear(
                 seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method
-            ) if self.gear_locator else (Const.Gear.ERROR_POS, Const.Gear.ERROR_ANGLE)
+            ) if self.gear_locator else (Const.Gear.ERROR_POS, Const.Gear.ERROR_ANGLE, show_img)
         except Exception as e:
             print(f"\033[31m[ERROR] Gear locating failed: {e}\033[0m")
             gear_pos, gear_angle = Const.Gear.ERROR_POS, Const.Gear.ERROR_ANGLE
 
-        # 用半径区分hole和calib hole, hole~140, calibhole~100
-        if Const.Vision.USE_RADIUS_SPLIT_CALIB_HOLE:
-            seg_list = self.use_radius_split_calib_hole(seg_list)
 
         # 处理孔洞检测
         try:
-            hole_list = self.hole_locator.locate_hole(
+            hole_list, show_img = self.hole_locator.locate_hole(
                 seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method
-            ) if self.hole_locator else []
+            ) if self.hole_locator else ([], show_img)
         except Exception as e:
             print(f"\033[31m[ERROR] Hole locating failed: {e}\033[0m")
             hole_list = []
 
         # 处理标定孔洞检测
-        
-
         try:
             if Const.Vision.USE_CALIB_LIST:
                 calib_hole = self.hole_locator.locate_calib_circle_list(
@@ -934,11 +952,14 @@ class ImageProcessor:
         """ 检测齿轮位置和角度 """
 
         show_img = deepcopy(img) 
-        seg_list = self.yolo_sam_predict(img)
+        seg_list, mark_points = self.yolo_sam_predict(img)
+
+        for mark in mark_points:
+            cv2.circle(show_img, (mark[0], mark[1]), 5, (0, 255, 0), -1)
         
         assert len(seg_list) > 0, "No valid segment results found"
         # 处理齿轮检测
-        gear_pos, gear_angle = self.gear_locator.locate_gear(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.gear_locator else (Const.Gear.ERROR_POS, Const.Gear.ERROR_ANGLE)
+        gear_pos, gear_angle, show_img = self.gear_locator.locate_gear(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.gear_locator else (Const.Gear.ERROR_POS, Const.Gear.ERROR_ANGLE)
         if self.show and show_img is not None:
             self._show_img(show_img, waitkey=self.waitkey)
 
@@ -957,7 +978,7 @@ class ImageProcessor:
         
         assert len(seg_list) > 0, "No valid segment results found"
         # 处理孔洞检测
-        hole_list = self.hole_locator.locate_hole(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.hole_locator else []
+        hole_list, show_img = self.hole_locator.locate_hole(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.hole_locator else []
 
         if self.show and show_img is not None:
             self._show_img(show_img, waitkey=self.waitkey)

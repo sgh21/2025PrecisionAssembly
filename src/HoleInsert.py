@@ -70,12 +70,12 @@ class HoleInsertClient(RobotClient):
             
             print(f"检测到目标圆孔位置: {target_pos}, 姿态: {target_ori}")
             
+            # current_pos = self.aubo.get_current_waypoint()['pos']
             # 移动到手眼标定位置（添加偏移）
-            current_pos = self.aubo.get_current_waypoint()['pos']
             final_pos = [
-                current_pos[0] + HAND_IN_EYE_OFFSET[0],
-                current_pos[1] + HAND_IN_EYE_OFFSET[1], 
-                current_pos[2] + HAND_IN_EYE_OFFSET[2] + DZ
+                target_pos[0] + HAND_IN_EYE_OFFSET[0],
+                target_pos[1] + HAND_IN_EYE_OFFSET[1], 
+                target_pos[2] + HAND_IN_EYE_OFFSET[2] + DZ
             ]
             final_ori = quaternion_standard2rpy(self.aubo.get_current_waypoint()['ori'])
             

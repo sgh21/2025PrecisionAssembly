@@ -1,14 +1,8 @@
-'''
-粗定位方案：
-Yolo: hole, gear
-SAM: keyhole
-'''
-
 #!/usr/bin/env python3
 import socket
 import pickle
 import queue
-import torch
+import os
 import cv2
 import threading
 import numpy as np  # needed for warmup printing
@@ -18,21 +12,15 @@ print("workspace:", workspace)
 sys.path.append(workspace)
 sys.path.append(os.path.join(workspace, 'configs'))
 from MVSControl import MVSController
-from ComputePoseV3 import ImageProcessor
+from ComputePose import ImageProcessor
 from ConstConfig import Const
 from Transform import *
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
 
 VISION_HOST = Const.Vision.HOST
 VISION_PORT = Const.Vision.PORT
 
 YOLO_WEIGHTS = os.path.join(workspace, Const.Yolo.MODEL_DIR,
                             Const.Yolo.YOLO_HOLE_WEIGHTS)
-
-SAM_MODEL_TYPE = Const.Sam.SAM_MODEL_TYPE
-SAM_WEIGHTS = os.path.join(workspace, Const.Sam.MODEL_DIR, Const.Sam.SAM_WEIGHTS)
-
 WAITKEY = Const.Task.WAITKEY  # OpenCV窗口等待时间
 
 TARGET_HOLE_IDX_LIST = Const.Task.TARGET_HOLE_IDX_LIST 
@@ -73,9 +61,7 @@ class VisionServer:
         try:
             self.mvs_handle = MVSController()
             # *： 实例化图片处理类
-            self.img_processor = ImageProcessor(
-                device=device, yolo_model_weights=YOLO_WEIGHTS,
-                model_weights=SAM_WEIGHTS, model_type=SAM_MODEL_TYPE, show=show, waitkey=WAITKEY)
+            self.img_processor = ImageProcessor(model_weights=YOLO_WEIGHTS, show=show, waitkey=WAITKEY)
 
             return True
         except Exception as e:
@@ -360,30 +346,5 @@ def main():
     print(f"与 {addr} 的连接已关闭。")
     vision_server.close()
 
-def main_offline():
-    mvs_handle = MVSController()
-    img_processor = ImageProcessor(
-                device=device, yolo_model_weights=YOLO_WEIGHTS,
-                model_weights=SAM_WEIGHTS, model_type=SAM_MODEL_TYPE, show=True, waitkey=WAITKEY)
-    while True:
-        img = mvs_handle.get_image()
-        if img is None:
-            print("未获取到图像")
-            continue
-        gear_pos, hole_list, gear_angle, calib_hole, show_img = img_processor.process_image(img, circle_fit_method='EdgeDrawing')
-        show_img = cv2.resize(show_img, (Const.Camera.IMG_SHAPE_SHOW[1], Const.Camera.IMG_SHAPE_SHOW[0]))
-        cv2.imshow("Offline Processing", show_img)
-        print(f"Gear position: {gear_pos}")
-        print(f"Hole list: {hole_list}")
-        print(f"Gear angle: {gear_angle * 180 / np.pi:.2f} degrees")
-        cv2.waitKey(50)
-
-
 if __name__ == '__main__':
-    args = sys.argv
-    if len(args) > 1 and args[1] == "offline":
-        print("运行离线模式")
-        main_offline()  # 调用离线模式的 main 函数
-    else:
-        print("运行在线模式")
-        main()  # 调用在线模式的 main 函数
+    main()

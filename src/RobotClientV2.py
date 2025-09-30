@@ -170,7 +170,7 @@ class RobotClient:
         pos_error_threshold = POS_ERROR_THRESHOLD
         if object == GEAR:
             pos_error_threshold *= 10
-        while pos_error > pos_error_threshold:
+        while True:
             # cnt+=1
             # if cnt >= 5:
             #     pos_error_threshold += POS_ERROR_THRESHOLD*0.1
@@ -206,6 +206,9 @@ class RobotClient:
             pos_error = np.linalg.norm(Delta_X)
             new_pos = np.array(current_pos) + np.array([Delta_X[0], Delta_X[1], 0])#*0.8
             new_ori = current_ori  # 姿态保持不变
+            if pos_error < pos_error_threshold:
+                print(f"{object}位置误差满足要求: {pos_error*1000:.3f}mm < {pos_error_threshold*1000:.3f}mm，停止移动")
+                break
             print(f"移动到新位置: {new_pos.tolist()}, 姿态: {new_ori}, 位置误差: {pos_error*1000:.3f}mm")
             self.aubo.movel(new_pos.tolist(), new_ori, joint=True)
             time.sleep(TIME_SLEEP)  # 等待机械臂稳定
@@ -214,7 +217,8 @@ class RobotClient:
 
         current_pos = self.aubo.get_current_waypoint()['pos']
         if object == HOLE:
-            target_pos = current_pos
+            # target_pos = current_pos  # 达到阈值后读取当前位置
+            target_pos = new_pos.tolist()  # 达到阈值后使用补偿后的位置
             target_ori = quaternion_standard2rpy(self.aubo.get_current_waypoint()['ori'])
             return target_pos, target_ori  # 返回圆孔位置和姿态
         elif object == GEAR:
@@ -364,13 +368,13 @@ def main():
     gear_pos , gear_angle, gear_flag_str = None, None, 'n'
     for target_hole_idx in TARGET_HOLE_IDX_LIST:
         print(f"开始处理目标圆孔索引: {target_hole_idx}")
+        gear_flag_str = input("请确认是否使用上次检测齿轮位置和角度(y/n): ").strip().lower()
         gear_flag = gear_flag_str == 'y'
         gear_pos, gear_angle = robot_client.reset_and_insert_hole(
             target_hole_idx=target_hole_idx,
             gear_pos=gear_pos if gear_flag else None,
             gear_angle=gear_angle if gear_flag else None
         )
-        gear_flag_str = input("请确认是否使用上次检测齿轮位置和角度(y/n): ").strip().lower()
 
     robot_client.set_robot_mode('fast')  # 设置机械臂为稳定模式
     robot_client.aubo.movel(ROBOT_INIT_POS, ROBOT_INIT_ORI, joint=True)  # 回到初始位置

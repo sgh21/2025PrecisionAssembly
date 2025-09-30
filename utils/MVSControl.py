@@ -3,6 +3,7 @@ import numpy as np
 from ctypes import *
 from MvImport.MvCameraControl_class import *
 from MvImport.PixelType_header import *
+import Lightness
 
 class MVSController:
     def __init__(self):
@@ -381,7 +382,15 @@ if __name__ == "__main__":
             center_point = (width // 2, height // 2)
             show_image = image.copy()
             cv2.circle(show_image, center_point, radius=5, color=(0, 0, 255), thickness=-1)
+            cv2.rectangle(show_image, (width//2-450, height//2-450), (width//2 + 450, height//2 + 450), (255, 0, 0), 5)
+
+            local_image = image[height//2-450:height//2+450, width//2-450:width//2+450]
+            gray_mean, gray_median = Lightness.calc_mean_gray(local_image)
+            v_mean, v_median = Lightness.calc_mean_value(local_image)
+            text = f"Gray Mean: {gray_mean:.2f}, Gray Median: {gray_median:.2f}, V Mean: {v_mean:.2f}, V Median: {v_median:.2f}"
+            cv2.putText(show_image, text, (120, 130), cv2.FONT_HERSHEY_SIMPLEX, 1.4, (0, 255, 0), 4)
             cv2.imshow("image", show_image)
+
             key = cv2.waitKey(50) & 0xFF
             if key == ord('q'):
                 cv2.destroyAllWindows()
