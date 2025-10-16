@@ -15,49 +15,53 @@ DATASET_DIR = Const.Data.DATASET_DIR
 IMG_DIR = os.path.join(workspace, 'test', 'images')
 
 def infer_and_show(model, img, win_name="YOLO"):
-    # results = model(img)
-    # res_plotted = results[0].plot()
-    # cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
-    # cv2.resizeWindow(win_name, IMG_SHAPE_SHOW[1], IMG_SHAPE_SHOW[0])
-    # cv2.imshow(win_name, res_plotted)
-    # return res_plotted
-    results = model.predict(img, retina_masks = True, conf = Const.Yolo.YOLO_CONF)
-    result_img = img.copy()
+    results = model(img)
+    res_plotted = results[0].plot()
+    cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(win_name, IMG_SHAPE_SHOW[1], IMG_SHAPE_SHOW[0])
+    cv2.imshow(win_name, res_plotted)
+    return res_plotted
 
-    # 遍历检测结果
-    boxes = results[0].boxes.xyxy.cpu().numpy()
-    masks = results[0].masks.data.cpu().numpy()
-    classes = results[0].boxes.cls.cpu().numpy().astype(int)
-    # probs = results[0].probs.cpu().numpy()
-    for i in range(len(boxes)):
+    # results = model.predict(img, retina_masks = True, conf = Const.Yolo.YOLO_CONF)
+    # result_img = img.copy()
 
-        cls_id = int(classes[i])  # 类别ID
-        mask = masks[i] if masks is not None else None  # 获取掩码
-        # conf = probs[i]  # 置信度
-        x1, y1, x2, y2 = map(int, boxes[i])  # 边界框坐标
+    # # 遍历检测结果
+    # boxes = results[0].boxes.xyxy.cpu().numpy()
+    # masks = results[0].masks.data.cpu().numpy()
+    # classes = results[0].boxes.cls.cpu().numpy().astype(int)
+    # # probs = results[0].probs.cpu().numpy()
+    # for i in range(len(boxes)):
 
-        # 如果有掩码，绘制自定义颜色
-        if mask is not None:
-            mask_resized = (mask > 0.5).astype(np.uint8)  # 二值化掩码
+    #     cls_id = int(classes[i])  # 类别ID
+    #     mask = masks[i] if masks is not None else None  # 获取掩码
+    #     # conf = probs[i]  # 置信度
+    #     x1, y1, x2, y2 = map(int, boxes[i])  # 边界框坐标
 
-            # 自定义颜色（例如：gear 类别为绿色）
-            if cls_id == Const.ClassInfo.GEAR_CLASS or cls_id == Const.ClassInfo.CLASS_DICT[Const.ClassInfo.GEAR_CLASS]:
-                color = (0, 255, 0)  # 绿色
-            else:
-                color = (255, 0, 0)  # 默认蓝色
+    #     # 如果有掩码，绘制自定义颜色
+    #     if mask is not None:
+    #         mask_resized = (mask > 0.5).astype(np.uint8)  # 二值化掩码
+    #         mask_resized = np.expand_dims(mask_resized, axis=-1)  # 扩展为 (H, W, 1)
+    #         mask_resized = np.repeat(mask_resized, 3, axis=-1)    # 复制通道，变为 (H, W, 3)
 
-            # 在原图上绘制掩码
-            colored_mask = np.zeros_like(result_img, dtype=np.uint8)
-            print(colored_mask.shape, mask_resized.shape)
-            result_img = np.where(mask_resized == 1,
-                                    result_img * 0.9 + color * 0.1,
-                                    result_img)
-            # result_img = cv2.addWeighted(result_img, 0.7, colored_mask, 0.3, 0)
+    #         # 自定义颜色（例如：gear 类别为绿色）
+    #         if cls_id == Const.ClassInfo.GEAR_CLASS or cls_id == Const.ClassInfo.CLASS_DICT[Const.ClassInfo.GEAR_CLASS]:
+    #             color = (0, 255, 0)  # 绿色
+    #         else:
+    #             color = (255, 0, 0)  # 默认蓝色
+    #         # color = np.array(color, dtype=np.uint8)
 
-        # 绘制边界框和类别标签
-        label = f"{Const.ClassInfo.CLASS_NAME_DICT[cls_id]}"# {conf:.2f}"
-        cv2.rectangle(result_img, (x1, y1), (x2, y2), color, 2)
-        cv2.putText(result_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+    #         # 在原图上绘制掩码
+    #         colored_mask = np.zeros_like(result_img, dtype=np.uint8)
+    #         print(colored_mask.shape, mask_resized.shape)
+    #         result_img = np.where(mask_resized == 1,
+    #                                 result_img * 0.9 + color * 0.1,
+    #                                 result_img)
+    #         # result_img = cv2.addWeighted(result_img, 0.7, colored_mask, 0.3, 0)
+
+    #     # 绘制边界框和类别标签
+    #     label = f"{Const.ClassInfo.CLASS_NAME_DICT[cls_id]}"# {conf:.2f}"
+    #     cv2.rectangle(result_img, (x1, y1), (x2, y2), color, 2)
+    #     cv2.putText(result_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
     # 显示结果
     cv2.namedWindow(win_name, cv2.WINDOW_NORMAL)

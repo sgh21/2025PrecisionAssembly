@@ -897,12 +897,12 @@ class ImageProcessor:
         for mark in mark_points:
             cv2.circle(show_img, (mark[0], mark[1]), 5, (0, 255, 0), -1)
 
-        gear_num = sum([1 for seg in seg_list if seg.class_name == Const.ClassInfo.GEAR_CLASS])
-        keyhole_num = sum([1 for seg in seg_list if seg.class_name == Const.ClassInfo.KEYHOLE_CLASS])
-        hole_num = sum([1 for seg in seg_list if seg.class_name == Const.ClassInfo.HOLE_CLASS])
-        calib_num = sum([1 for seg in seg_list if seg.class_name == Const.ClassInfo.CALIB_CLASS])
-        print(f"Detected {gear_num} gears, {keyhole_num} keyholes, {hole_num} holes, {calib_num} calib holes.")
-        cv2.putText(show_img, f"Detected {gear_num} gears, {keyhole_num} keyholes, {hole_num} holes, {calib_num} calib holes.", (120, 140), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 0, 0), 5)
+        # gear_num = sum([1 for seg in seg_list if seg.class_name == Const.ClassInfo.GEAR_CLASS])
+        # keyhole_num = sum([1 for seg in seg_list if seg.class_name == Const.ClassInfo.KEYHOLE_CLASS])
+        # hole_num = sum([1 for seg in seg_list if seg.class_name == Const.ClassInfo.HOLE_CLASS])
+        # calib_num = sum([1 for seg in seg_list if seg.class_name == Const.ClassInfo.CALIB_CLASS])
+        # print(f"Detected {gear_num} gears, {keyhole_num} keyholes, {hole_num} holes, {calib_num} calib holes.")
+        # cv2.putText(show_img, f"Detected {gear_num} gears, {keyhole_num} keyholes, {hole_num} holes, {calib_num} calib holes.", (120, 140), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 0, 0), 5)
 
         assert len(seg_list) > 0, "No valid segment results found"
 
@@ -987,11 +987,10 @@ class ImageProcessor:
     
     def detect_calib_hole(self, 
                           img: np.ndarray, 
-                          circle_fit_method: str = 'EdgeDrawing',
-                          mark_points: List[Tuple[int, int, int]]=[]) -> Tuple[float, float, float]:
+                          circle_fit_method: str = 'EdgeDrawing') -> Tuple[float, float, float]:
 
         show_img = deepcopy(img) 
-        seg_list = self.sam_predict(img, mark_points=mark_points, class_ids=[Const.ClassInfo.CALIB_CLASS]*len(mark_points))
+        seg_list = self.yolo_predict(img)
 
         assert len(seg_list) > 0, "No valid segment results found"
 

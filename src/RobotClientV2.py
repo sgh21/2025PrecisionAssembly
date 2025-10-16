@@ -166,16 +166,11 @@ class RobotClient:
         current_pos = deepcopy(current_waypoint['pos'])
         current_ori = quaternion_standard2rpy(current_waypoint['ori'])
 
-        cnt = 0
         pos_error_threshold = POS_ERROR_THRESHOLD
         if object == GEAR:
             pos_error_threshold *= 10
         while True:
-            # cnt+=1
-            # if cnt >= 5:
-            #     pos_error_threshold += POS_ERROR_THRESHOLD*0.1
-            #     cnt = 0
-            #     print(f"多次检测未能满足位置误差要求，放宽位置要求：{pos_error_threshold}米")
+            time.sleep(TIME_SLEEP)  # 等待机械臂稳定
             # 发送检测命令
             self.send_command({'command': 'detect','object': object, 'target_hole_idx': target_hole_idx})
             result = self.receive_data()
@@ -211,7 +206,6 @@ class RobotClient:
                 break
             print(f"移动到新位置: {new_pos.tolist()}, 姿态: {new_ori}, 位置误差: {pos_error*1000:.3f}mm")
             self.aubo.movel(new_pos.tolist(), new_ori, joint=True)
-            time.sleep(TIME_SLEEP)  # 等待机械臂稳定
             current_pos = new_pos.tolist()
             current_ori = new_ori
 
@@ -315,11 +309,7 @@ class RobotClient:
         init_ori = deepcopy(ROBOT_INIT_ORI)
 
         # 移动到初始位置
-        self.set_robot_mode('fast')
         self.aubo.movel(init_pos, init_ori, joint=True)
-        time.sleep(TIME_SLEEP)  # 等待机械臂稳定
-
-        # self.set_robot_mode('stable')
         if gear_pos is None or gear_angle is None:
             gear_pos, gear_angle = self.move_and_detect(object=GEAR)
 
@@ -365,6 +355,7 @@ def main():
         print("视觉服务器未连接，退出。")
         robot_client.aubo.disconnect()
         return
+    robot_client.set_robot_mode('fast')  # 设置机械臂为快速模式
     gear_pos , gear_angle, gear_flag_str = None, None, 'n'
     for target_hole_idx in TARGET_HOLE_IDX_LIST:
         print(f"开始处理目标圆孔索引: {target_hole_idx}")
@@ -376,7 +367,6 @@ def main():
             gear_angle=gear_angle if gear_flag else None
         )
 
-    robot_client.set_robot_mode('fast')  # 设置机械臂为稳定模式
     robot_client.aubo.movel(ROBOT_INIT_POS, ROBOT_INIT_ORI, joint=True)  # 回到初始位置
     print("机械臂已回到初始位置。")
     # 断开连接

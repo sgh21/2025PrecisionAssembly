@@ -18,14 +18,14 @@ class Const:
 
         INIT_POS = [-0.477483, -0.068571, 0.236420]  # 初始位置 [x, y, z] 单位: m
         INIT_ORI = [PI, 0, -PI/2]  # 初始姿态 [roll, pitch, yaw] 单位: rad
-        CALIB_POS = [-0.48885, -0.1579199, 0.236420]
+        CALIB_POS = [-0.48, -0.1576, 0.236420]
         CALIB_ORI = [PI, 0, -PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
         
         # HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.20] # 手眼标定位置 [x, y, z] 单位: m
-        JOINT_MAX_ACC = [0.15] * 6
-        JOINT_MAX_VELC = [0.15] * 6
-        END_MAX_ACC = 0.10
-        END_MAX_VELC = 0.10
+        JOINT_MAX_ACC = [0.3] * 6
+        JOINT_MAX_VELC = [0.3] * 6
+        END_MAX_ACC = 0.3
+        END_MAX_VELC = 0.3
         JOINT_STABLE_ACC = [0.10] * 6
         JOINT_STABLE_VELC = [0.10] * 6
         END_STABLE_ACC = 0.10
@@ -44,14 +44,13 @@ class Const:
         X_OFFSET = 0.11  # 相机X轴偏移量（米） -2.0147132317361707
         HAND_IN_EYE_OFFSET = [-0.11344396, 0.00027828, -0.150]
         HAND_IN_EYE_OFFSET_LIST = [
-            [-0.11341275, 0.00023554, -0.150],
-            [-0.113275, 0.00025307, -0.150],
-            [-0.11342842, 0.0002757, -0.150],
+            [-0.11341202, 0.00044193, -0.150],
+            [-0.11344202, 0.00044193, -0.150],
+            [-0.11338655, 0.00022249, -0.150],
             [-0.11342842, -0.0002757, -0.150],
             [-0.11342842, -0.0002757, -0.150],
             [-0.11342842, -0.0002757, -0.150]
         ]
-
 
         SEPARATE_CONTROLLER_INIT_ANGLE = False  # 是否分别使用不同的控制器初始角度
         CONTROLLER_INIT_ANGLE = -0.15 / 180 * PI
