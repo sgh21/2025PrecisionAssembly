@@ -97,7 +97,7 @@ class HandInEyeCalibClient(RobotClient):
             time.sleep(TIME_SLEEP)
             
             # 使用父类的move_and_detect方法精确定位到齿轮
-            gear_pos, gear_angle = self.move_and_detect(object=GEAR)
+            gear_pos, gear_angle = self.move_and_detect(object=GEAR, times_limit=1)
             
             print(f"检测到齿轮位置: {gear_pos}, 角度: {gear_angle * 180 / np.pi:.2f} deg")
             

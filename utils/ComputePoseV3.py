@@ -543,7 +543,9 @@ class LocateGear:
                 else:
                     theta_left.append(theta[mask])
                     rho_left.append(rho[mask])
-            
+
+            print(f"齿根左侧点数：{[len(r) for r in rho_left]}, 右侧点数：{[len(r) for r in rho_right]}")
+
             radius_mark = radius_pitch+tooth_height/6 # 选取标记点的圆半径
 
             theta_mark_left = []  # 左半齿的标记点角度
@@ -552,6 +554,8 @@ class LocateGear:
             if show_img is not None :
                 for i, r in enumerate(rho_left):
                     error = np.abs(r - radius_mark)
+                    if len(error) == 0:
+                        continue
                     # if min(error) > 20:
                     #     continue
                     idx_left = np.argmin(error)  # 找到最接近radius_mark的点
@@ -560,6 +564,8 @@ class LocateGear:
                     cv2.circle(show_img, (int(cx + r[idx_left] * np.cos(theta_mark)), int(cy + r[idx_left] * np.sin(theta_mark))), 2, (255, 0, 255), 10)
                 for i, r in enumerate(rho_right):
                     error = np.abs(r - radius_mark)
+                    if len(error) == 0:
+                        continue
                     # if min(error) > 20:
                     #     continue
                     idx_right = np.argmin(error)
@@ -750,10 +756,11 @@ class ImageProcessor:
         '''
         用于检测齿轮位置，有线使用yolo，在检测失效情况下使用sam辅助检测
         '''
+        mark_points = []
         results = self.yolo_model.predict(img, retina_masks = True, conf = Const.Yolo.YOLO_CONF)
         if len(results) == 0 or results[0].masks==None:
             print("No valid detection results found.")
-            return Const.Gear.ERROR_POS+(0,), [], Const.Gear.ERROR_ANGLE, None
+            return Const.Gear.ERROR_POS+(0,), []
         
         if self.show:
             img_show = results[0].plot()  # 获取可视化结果
@@ -789,7 +796,6 @@ class ImageProcessor:
             center = [(x1+x2)/2, (y1+y2)/2]  # 中心点
             radius_a = (x2-x1+y2-y1)/4 # 齿顶半径估计值
             radius_mark = radius_a / Const.Gear.PEAK_RADIUS * Const.Gear.KEYHOLE_MARK_RADIUS #SAM标记点的半径估计值
-            mark_points = []
             for angle in [0, np.pi/3, 2*np.pi/3, np.pi, 4*np.pi/3, 5*np.pi/3]:
                 px = int(center[0] + radius_mark * np.cos(angle))
                 py = int(center[1] + radius_mark * np.sin(angle))
@@ -905,8 +911,6 @@ class ImageProcessor:
         # cv2.putText(show_img, f"Detected {gear_num} gears, {keyhole_num} keyholes, {hole_num} holes, {calib_num} calib holes.", (120, 140), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 0, 0), 5)
 
         assert len(seg_list) > 0, "No valid segment results found"
-
-
 
         # 处理齿轮检测
         try:

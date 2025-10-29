@@ -140,10 +140,19 @@ class RobotClient:
         else:
             raise ValueError(f"Unsupported mode: {mode}")
     
+    def capture(self):
+        self.send_command({'command': 'capture'})
+        result = self.receive_data()
+        return result.get('status')
+
     def detect(self, 
                object: str, 
-               target_hole_idx: int = Const.Task.TARGET_HOLE_IDX) -> Optional[Tuple[float, float, float]]:
+               target_hole_idx: int = Const.Task.TARGET_HOLE_IDX,
+               no_capture=False) -> Optional[Tuple[float, float, float]]:
         """检测指定物体的位置和姿态"""
+        if not no_capture:
+            self.send_command({'command': 'capture'})
+            result = self.receive_data()
         self.send_command({'command': 'detect', 'object': object, 'target_hole_idx': target_hole_idx})
         result = self.receive_data()
         if not isinstance(result, dict) or result.get('status') != 'success':
@@ -151,14 +160,15 @@ class RobotClient:
                 print(f"服务端返回错误: {result.get('message', '未知错误')}")
             else:
                 print("服务端返回错误: 未知错误（数据格式异常或未收到数据）")
-        img_bytes = result.get('img')
-        img = self.decode_img(img_bytes)
-        return result.get('result'), img
+        # img_bytes = result.get('img')
+        # img = self.decode_img(img_bytes)
+        return result.get('result')#, img
 
     def move_and_detect(
         self, 
         object: str = HOLE,
-        target_hole_idx = Const.Task.TARGET_HOLE_IDX
+        target_hole_idx = Const.Task.TARGET_HOLE_IDX,
+        times_limit = 3 # 最多循环移动次数
     ) -> Tuple[List[float], List[float]]:
         """移动机械臂并检测圆孔/齿轮位置"""
         pos_error = 10.0  # 初始位置误差
@@ -169,9 +179,16 @@ class RobotClient:
         pos_error_threshold = POS_ERROR_THRESHOLD
         if object == GEAR:
             pos_error_threshold *= 10
-        while True:
+        
+        times = 0
+        while times < times_limit:
+            times += 1
+            print(f"第 {times} 次检测 {object}，当前位置: {current_pos}, 姿态: {current_ori}")
             time.sleep(TIME_SLEEP)  # 等待机械臂稳定
             # 发送检测命令
+            self.send_command({'command': 'capture'})
+            result = self.receive_data()
+            print(f"Capture Result: {result}")
             self.send_command({'command': 'detect','object': object, 'target_hole_idx': target_hole_idx})
             result = self.receive_data()
             if not isinstance(result, dict) or result.get('status') != 'success':
@@ -182,7 +199,8 @@ class RobotClient:
                 continue
 
             if object == HOLE:
-                u, v, r = result['result']
+                # print(f"检测到圆孔，结果: {result['result']}")
+                u, v, r = result['result'][0]
             elif object == GEAR:
                 gear_pos, gear_angle = result['result']
                 if gear_pos is None:
@@ -199,7 +217,7 @@ class RobotClient:
             Delta_X = -np.linalg.inv(A).dot(U - U0)/1000
             # 计算新的末端位置，评估当前检测的误差
             pos_error = np.linalg.norm(Delta_X)
-            new_pos = np.array(current_pos) + np.array([Delta_X[0], Delta_X[1], 0])#*0.8
+            new_pos = np.array(current_pos) + np.array([Delta_X[0], Delta_X[1], 0])
             new_ori = current_ori  # 姿态保持不变
             if pos_error < pos_error_threshold:
                 print(f"{object}位置误差满足要求: {pos_error*1000:.3f}mm < {pos_error_threshold*1000:.3f}mm，停止移动")
@@ -244,8 +262,9 @@ class RobotClient:
                 target_pos[1] - gear_pos[1]
         )
 
-        assert np.abs(( center_connection_angle % (np.pi / 3)) - np.pi / 6) < 5 / 180 * np.pi, '中心连线角度不正确，请检查齿轮和圆孔位置'
-        
+        controller_angle_error = np.abs((center_connection_angle % (np.pi / 3)) - np.pi / 6)
+        assert controller_angle_error < 25 / 180 * np.pi, f'中心连线角度不正确：{controller_angle_error*180/np.pi:.2f} deg，请检查齿轮和圆孔位置'
+
         controller_angle = gear_angle2controller_angle(
                 gear_angle, 
                 center_connection_angle,
@@ -266,7 +285,7 @@ class RobotClient:
             hand_in_eye_offset = HAND_IN_EYE_OFFSET_LIST[target_hole_idx]
         else:
             hand_in_eye_offset = HAND_IN_EYE_OFFSET
-        target_insert_pos = np.array(target_pos) +np.array(hand_in_eye_offset) 
+        target_insert_pos = np.array(target_pos) + np.array(hand_in_eye_offset) 
         target_insert_ori = np.array(target_ori) + np.array([0, 0, delta_controller_angle])
 
         target_insert_pos_list = []
@@ -290,7 +309,7 @@ class RobotClient:
         # 插入点（竖直向下到孔口）
         insert_pos = deepcopy(target_insert_pos)
 
-        # 插入点下方安全点
+        # 插入点上方安全点
         safe_pos = np.array([target_insert_pos[0], target_insert_pos[1], target_insert_pos[2] + dz])
 
         # 将所有点添加到列表中
@@ -300,6 +319,7 @@ class RobotClient:
         return target_insert_pos_list, target_insert_ori_list
     
     def reset_and_insert_hole(self, 
+                              hole_pos_list: List[Tuple[float, float,float]],
                               target_hole_idx: List[int] = TARGET_HOLE_IDX, 
                               gear_pos: List[float] = None, 
                               gear_angle: float = None
@@ -308,14 +328,31 @@ class RobotClient:
         init_pos = deepcopy(ROBOT_INIT_POS)
         init_ori = deepcopy(ROBOT_INIT_ORI)
 
-        # 移动到初始位置
-        self.aubo.movel(init_pos, init_ori, joint=True)
+        self.set_robot_mode('fast')
+        # 拍齿轮照
+        self.capture()
+        time.sleep(0.1)
+        gear_pos = self.aubo.get_current_waypoint()['pos']  # 齿轮位置
+        # 移动到目标粗位置
+        target_hole_pos = hole_pos_list[target_hole_idx]  # 孔的粗定位结果，[x,y,r]列表或None
+        if target_hole_pos is not None:
+            current_waypoint = self.aubo.get_current_waypoint()
+            current_pos = deepcopy(current_waypoint['pos'])
+            current_ori = quaternion_standard2rpy(current_waypoint['ori'])
+            u,v = target_hole_pos[:2]
+            U = np.array([u, v])
+            U0 = np.array(INTRINSIC_U0)
+            A = np.array(INTRINSIC_A)
+            Delta_X = -np.linalg.inv(A).dot(U - U0)/1000
+            new_pos = np.array(current_pos) + np.array([Delta_X[0], Delta_X[1], 0])
+            new_ori = current_ori  # 姿态保持不变
+            self.aubo.movel(new_pos.tolist(), new_ori, joint=True)
+        # 移动后进行齿轮检测
         if gear_pos is None or gear_angle is None:
-            gear_pos, gear_angle = self.move_and_detect(object=GEAR)
-
+            _, gear_angle = self.detect(object=GEAR, no_capture=True)
         print(f"齿轮位置: {gear_pos}, 角度: {gear_angle * 180 / np.pi} deg")
-
-        target_pos, target_ori = self.move_and_detect(object=HOLE, target_hole_idx=target_hole_idx)
+        # 目标孔的精确定位
+        target_pos, target_ori = self.move_and_detect(object=HOLE, target_hole_idx=target_hole_idx, times_limit=2)
         print(f"目标圆孔位置: {target_pos}, 姿态: {target_ori}")
 
         target_insert_pos_list, target_insert_ori_list = self.calculate_safe_approach_waypoints(
@@ -329,19 +366,20 @@ class RobotClient:
             use_separate_controller_angle=Const.Robot.SEPARATE_CONTROLLER_INIT_ANGLE  # 不同孔位使用各自的预设控制器角度
         )
 
-        # self.set_robot_mode('fast')
         waypoint_cnt = 0
         for pos, ori in zip(target_insert_pos_list, target_insert_ori_list):
             waypoint_cnt += 1
             if waypoint_cnt == 3:
                 self.set_robot_mode('insert')
+            elif waypoint_cnt == 4:
+                self.set_robot_mode('fast')
             print(f"插入位置: {pos}, 姿态: {ori}")
             self.aubo.movel(pos, ori, joint=False)
             # input("请确认圆孔已插入，按回车键继续.")
-        else:
-            print("圆孔插入完成，回到初始位置。")
-            self.set_robot_mode('fast')
-            self.aubo.movel(init_pos, init_ori, joint=True)
+       
+        print("圆孔插入完成，回到初始位置。")
+        self.set_robot_mode('fast')
+        self.aubo.movel(init_pos, init_ori, joint=True)
 
         return gear_pos, gear_angle
 
@@ -357,17 +395,24 @@ def main():
         return
     robot_client.set_robot_mode('fast')  # 设置机械臂为快速模式
     gear_pos , gear_angle, gear_flag_str = None, None, 'n'
+
+    # 全局拍照，记录各孔粗位置
+    robot_client.aubo.movel(ROBOT_INIT_POS, ROBOT_INIT_ORI, joint=True)  # 回到初始位置
+    time.sleep(TIME_SLEEP)
+    hole_pos_list = robot_client.detect(object=HOLE, target_hole_idx=TARGET_HOLE_IDX_LIST)
+
+    # 全流程插孔
     for target_hole_idx in TARGET_HOLE_IDX_LIST:
         print(f"开始处理目标圆孔索引: {target_hole_idx}")
         gear_flag_str = input("请确认是否使用上次检测齿轮位置和角度(y/n): ").strip().lower()
         gear_flag = gear_flag_str == 'y'
         gear_pos, gear_angle = robot_client.reset_and_insert_hole(
+            hole_pos_list=hole_pos_list,
             target_hole_idx=target_hole_idx,
             gear_pos=gear_pos if gear_flag else None,
             gear_angle=gear_angle if gear_flag else None
         )
 
-    robot_client.aubo.movel(ROBOT_INIT_POS, ROBOT_INIT_ORI, joint=True)  # 回到初始位置
     print("机械臂已回到初始位置。")
     # 断开连接
     cv2.destroyAllWindows()

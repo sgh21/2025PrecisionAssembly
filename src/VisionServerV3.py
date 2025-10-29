@@ -136,6 +136,7 @@ class VisionServer:
         return buffer.tobytes()
 
     def handle_client(self,  client_socket: socket.socket):
+        self.img_to_detect = None
         while True:
             # 接收客户端的请求：4字节长度 + payload
             try:
@@ -158,59 +159,66 @@ class VisionServer:
                 break
             
             # 处理指令
-            if client_command.get('command') == 'detect':
+            print(f"收到指令：{client_command.get('command')}")
+            if client_command.get('command') == 'capture':
+                t1 = cv2.getTickCount()
+                img = self.mvs_handle.get_image()
+                while img is None:
+                    print("未获取到图像，重新拍照")
+                    img = self.mvs_handle.get_image()
+                    cv2.waitKey(20)
+                self.img_to_detect = img
+                self.send_to_display(img)
+                t2 = cv2.getTickCount()
+                print(f"拍照时间：{(t2 - t1) / cv2.getTickFrequency()}s")
+                result = {'status': 'success'}
+                data_to_send = pickle.dumps(result)
+                client_socket.sendall(len(data_to_send).to_bytes(4, byteorder='big'))
+                client_socket.sendall(data_to_send)
+
+            elif client_command.get('command') == 'detect':
                 obj = client_command.get('object')
                 if obj == HOLE:
                     target_hole_idx = client_command.get('target_hole_idx', 0)
+                    if isinstance(target_hole_idx, int):
+                        idx_list = [target_hole_idx]
+                    elif isinstance(target_hole_idx, (list, tuple, np.ndarray)):
+                        idx_list = list(target_hole_idx)
                     t1 = cv2.getTickCount()
-                    img = self.mvs_handle.get_image()
-                    if img is None:
-                        print("未获取到图像")
-                        continue
-                    self.send_to_display(img)
-                    t3 = cv2.getTickCount()
                     hole_list, show_img = self.img_processor.detect_hole(
-                        img,
+                        self.img_to_detect,
                         circle_fit_method='EdgeDrawing',
                     )
                     if show_img is not None:
                         self.send_to_display(show_img)
                     
-                    # 越界/无效检查
-                    if (not hole_list or
-                        hole_list[target_hole_idx][2] is None):
-                        print("Target circle not found")
-                        error_data = pickle.dumps({'status': 'error', 'message': 'Target circle not found'})
-                        client_socket.sendall(len(error_data).to_bytes(4, byteorder='big'))
-                        client_socket.sendall(error_data)
-                        continue
+                    results = []
+                    for idx in idx_list:
+                        if idx < 0 or idx >= len(hole_list) or hole_list[idx][2] is None:
+                            results.append(None)
+                        else:
+                            u, v, r = hole_list[idx]
+                            results.append([float(u), float(v), float(r)])
 
-                    u, v, r = hole_list[target_hole_idx]
-                    t4 = cv2.getTickCount()
+                    t2 = cv2.getTickCount()
 
                     # 序列化数
                     img_bytes = self.encode_img(img)
-                    result = {'status': 'success', 'result': [float(u), float(v), float(r)], 'img': img_bytes}
+                    result = {'status': 'success', 'result': results, 'img': img_bytes}
                     data_to_send = pickle.dumps(result)
                     # 发送数据长度
                     client_socket.sendall(len(data_to_send).to_bytes(4, byteorder='big'))
                     # 发送数据
                     client_socket.sendall(data_to_send)
                     print('处理结果已发送给客户端')
-                    t2 = cv2.getTickCount()
-                    print(f'get_image处理时间：{(t3 - t1) / cv2.getTickFrequency()}s')
-                    print(f'YOLO处理时间：{(t4 - t3) / cv2.getTickFrequency()}s')
-                    print(f'数据传输时间：{(t2 - t4) / cv2.getTickFrequency()}s')
-                
+                    t3 = cv2.getTickCount()
+                    print(f'YOLO处理时间：{(t2 - t1) / cv2.getTickFrequency()}s')
+                    print(f'数据传输时间：{(t3 - t2) / cv2.getTickFrequency()}s')
+
                 elif obj == CALIB:
                     t1 = cv2.getTickCount()
-                    img = self.mvs_handle.get_image()
-                    if img is None:
-                        print("未获取到图像")
-                        continue
-                    t3 = cv2.getTickCount()
                     calib_circle, show_img = self.img_processor.detect_calib_hole(
-                        img,
+                        self.img_to_detect,
                         circle_fit_method='EdgeDrawing',
                     )
 
@@ -232,19 +240,13 @@ class VisionServer:
                     client_socket.sendall(data_to_send)
                     print('处理结果已发送给客户端')
                     t2 = cv2.getTickCount()
-                    print(f'get_image处理时间：{(t3 - t1) / cv2.getTickFrequency()}s')
-                    print(f'YOLO处理时间：{(t4 - t3) / cv2.getTickFrequency()}s')
+                    print(f'YOLO处理时间：{(t4 - t1) / cv2.getTickFrequency()}s')
                     print(f'数据传输时间：{(t2 - t4) / cv2.getTickFrequency()}s')
                 
                 elif obj == GEAR:
                     t1 = cv2.getTickCount()
-                    img = self.mvs_handle.get_image()
-                    if img is None:
-                        print("未获取到图像")
-                        continue
-                    t3 = cv2.getTickCount()
                     gear_pos, gear_angle, show_img = self.img_processor.detect_gear(
-                        img,
+                        self.img_to_detect,
                         circle_fit_method='EdgeDrawing',
                     )
                     if show_img is not None:
@@ -348,18 +350,22 @@ def main():
     # 等待客户端连接,阻塞，开始热身
     vision_server.start()
 
-    client_socket , addr = vision_server.server_socket.accept()
-    print(f"来自 {addr} 的连接已建立。")
-    vision_server.stop_warmup()
+    while True:
+        client_socket , addr = vision_server.server_socket.accept()
+        print(f"来自 {addr} 的连接已建立。")
+        vision_server.stop_warmup()
 
-    # 处理客户端请求
-    print("开始处理客户端请求.")
-    vision_server.handle_client(client_socket)
+        # 处理客户端请求
+        print("开始处理客户端请求.")
+        try:
+            vision_server.handle_client(client_socket)
+        except Exception as e:
+            print(f"处理客户端时发生异常: {e}")
+        finally:
+            client_socket.close()
+            print(f"与 {addr} 的连接已关闭。")
 
-    client_socket.close()
-    print(f"与 {addr} 的连接已关闭。")
-    vision_server.close()
-
+            
 def main_offline():
     mvs_handle = MVSController()
     img_processor = ImageProcessor(
