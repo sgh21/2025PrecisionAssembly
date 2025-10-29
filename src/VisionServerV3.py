@@ -14,13 +14,12 @@ import threading
 import numpy as np  # needed for warmup printing
 import os, sys
 workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-print("workspace:", workspace)
 sys.path.append(workspace)
-sys.path.append(os.path.join(workspace, 'configs'))
-from MVSControl import MVSController
-from ComputePoseV3 import ImageProcessor
-from ConstConfig import Const
-from Transform import *
+# print("workspace:", workspace)
+from utils.MVSControl import MVSController
+from utils.ComputePoseV3 import ImageProcessor
+from utils.Transform import *
+from configs.ConstConfig import Const
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -159,7 +158,6 @@ class VisionServer:
                 break
             
             # 处理指令
-            print(f"收到指令：{client_command.get('command')}")
             if client_command.get('command') == 'capture':
                 t1 = cv2.getTickCount()
                 img = self.mvs_handle.get_image()
@@ -365,7 +363,7 @@ def main():
             client_socket.close()
             print(f"与 {addr} 的连接已关闭。")
 
-            
+
 def main_offline():
     mvs_handle = MVSController()
     img_processor = ImageProcessor(

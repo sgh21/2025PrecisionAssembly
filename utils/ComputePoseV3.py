@@ -9,7 +9,7 @@ import numpy as np
 from typing import List, Tuple
 from copy import deepcopy
 import cv2
-from ConstConfig import Const, SegmentResult
+from configs.ConstConfig import Const, SegmentResult
 
 # * : begin define utility functions
 
@@ -544,7 +544,7 @@ class LocateGear:
                     theta_left.append(theta[mask])
                     rho_left.append(rho[mask])
 
-            print(f"齿根左侧点数：{[len(r) for r in rho_left]}, 右侧点数：{[len(r) for r in rho_right]}")
+            # print(f"齿根左侧点数：{[len(r) for r in rho_left]}, 右侧点数：{[len(r) for r in rho_right]}")
 
             radius_mark = radius_pitch+tooth_height/6 # 选取标记点的圆半径
 
@@ -784,10 +784,10 @@ class ImageProcessor:
                 mask = masks[i]
             ))
             
-            ### 测试SAM对keyhole分割效果
-            if seg_list[-1].class_name == Const.ClassInfo.KEYHOLE_CLASS:
-                seg_list.pop()  # 删除yolo检测到的keyhole
-            ###
+            # ### 测试SAM对keyhole分割效果，注释则在YOLO失效时才使用SAM
+            # if seg_list[-1].class_name == Const.ClassInfo.KEYHOLE_CLASS:
+            #     seg_list.pop()  # 删除yolo检测到的keyhole
+            # ###
         has_gear = any([seg.class_name == Const.ClassInfo.GEAR_CLASS for seg in seg_list])
         has_keyhole = any([seg.class_name == Const.ClassInfo.KEYHOLE_CLASS for seg in seg_list])
         if has_gear and not has_keyhole:
@@ -872,17 +872,7 @@ class ImageProcessor:
         cv2.resizeWindow("Detection Result", Const.Camera.IMG_SHAPE_SHOW[1], Const.Camera.IMG_SHAPE_SHOW[0])  # 你想要的尺寸
         cv2.imshow("Detection Result", show_img)
         cv2.waitKey(waitkey)  # 等待按键事件，0表示无限等待
-    
-    def use_radius_split_calib_hole(self, seg_list: List[SegmentResult]) -> Tuple[List[SegmentResult]]:
-        for seg in seg_list:
-                if seg.class_name == Const.ClassInfo.HOLE_CLASS or seg.class_name == Const.ClassInfo.CALIB_CLASS:
-                    x1, y1, x2, y2 = seg.xyxy_i
-                    radius = (x2-x1+y2-y1)/4
-                    if radius > Const.Vision.RADIUS_THRESHOLD:
-                        seg.class_name = Const.ClassInfo.HOLE_CLASS
-                    else:
-                        seg.class_name = Const.ClassInfo.CALIB_CLASS
-        return seg_list
+
 
     def process_image(self, img: np.ndarray, circle_fit_method: str = 'EdgeDrawing') -> Tuple[Tuple[int, int, float], List[Tuple[int, int, float]], float, Tuple[float, float, float]]:
         '''
@@ -976,9 +966,6 @@ class ImageProcessor:
         show_img = deepcopy(img) 
         seg_list = self.yolo_predict(img)
 
-        # 用半径区分hole和calib hole, hole~140, calibhole~100
-        if Const.Vision.USE_RADIUS_SPLIT_CALIB_HOLE:
-            seg_list = self.use_radius_split_calib_hole(seg_list)
         
         assert len(seg_list) > 0, "No valid segment results found"
         # 处理孔洞检测
@@ -998,9 +985,6 @@ class ImageProcessor:
 
         assert len(seg_list) > 0, "No valid segment results found"
 
-        # 用半径区分hole和calib hole, hole~140, calibhole~100
-        if Const.Vision.USE_RADIUS_SPLIT_CALIB_HOLE:
-            seg_list = self.use_radius_split_calib_hole(seg_list)
         
         for seg in seg_list:
             print(f"Class: {seg.class_name}, Box: {seg.xyxy_i}, Box Height: {seg.xyxy_i[3]-seg.xyxy_i[1]}, Width: {seg.xyxy_i[2]-seg.xyxy_i[0]}")

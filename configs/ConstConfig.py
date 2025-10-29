@@ -69,7 +69,7 @@ class Const:
         TARGET_HOLE_IDX_LIST = [0, 1, 2]  # 目标孔索引列表
         # TARGET_HOLE_IDX_LIST = [ 0, 1, 2, 3, 4, 5]
         # TARGET_HOLE_IDX_LIST = [2,2,2]
-        TIME_SLEEP = 1  # 等待机械臂稳定的时间
+        TIME_SLEEP = 0.8  # 等待机械臂稳定的时间
         WAITKEY = 30  # OpenCV窗口等待时间
 
     class Camera:
@@ -122,7 +122,7 @@ class Const:
     class Yolo:
         MODEL_DIR = r'./models'
         # YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0819.pt'
-        YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0910.pt'
+        # YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0910.pt'
         YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0914-200.pt'
         YOLO_CONF = 0.8  # YOLO检测置信度阈值
     

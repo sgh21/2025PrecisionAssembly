@@ -6,9 +6,13 @@ import pickle
 import numpy as np
 from copy import deepcopy
 from typing import List, Optional, Tuple
-from AuboControlLowLevel import AuboController
-from ConstConfig import Const
-from Transform import *
+
+import os, sys
+workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(workspace)
+from utils.AuboControlLowLevel import AuboController
+from utils.Transform import *
+from configs.ConstConfig import Const
 
 # ====== 配置参数 ======
 # 通讯协议说明：
