@@ -16,9 +16,9 @@ class Const:
         # CALIB_POS = [0.48885, -0.079199, 0.236420]  # 校准位置 [x, y, z] 单位: m
         # CALIB_ORI = [PI, 0, PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
 
-        INIT_POS = [-0.477483, -0.068571, 0.236420]  # 初始位置 [x, y, z] 单位: m
+        INIT_POS = [-0.377183, -0.068571, 0.236420]  # 初始位置 [x, y, z] 单位: m
         INIT_ORI = [PI, 0, -PI/2]  # 初始姿态 [roll, pitch, yaw] 单位: rad
-        CALIB_POS = [-0.48, -0.1576, 0.236420]
+        CALIB_POS = [-0.38, -0.1576, 0.236420]
         CALIB_ORI = [PI, 0, -PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
         
         # HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.20] # 手眼标定位置 [x, y, z] 单位: m
@@ -44,9 +44,9 @@ class Const:
         X_OFFSET = 0.11  # 相机X轴偏移量（米） -2.0147132317361707
         HAND_IN_EYE_OFFSET = [-0.11344396, 0.00027828, -0.150]
         HAND_IN_EYE_OFFSET_LIST = [
-            [-0.11341202, 0.00044193, -0.150],
-            [-0.11335625, 0.0007936, -0.150],
-            [-0.11348748, 0.00062911, -0.150],
+            [-0.113401, 0.000239, -0.150],
+            [-0.11344449, 0.00047502, -0.150],
+            [-0.11322746, 0.00030434, -0.150],
             [-0.11342842, -0.0002757, -0.150],
             [-0.11342842, -0.0002757, -0.150],
             [-0.11342842, -0.0002757, -0.150]
@@ -55,20 +55,16 @@ class Const:
         SEPARATE_CONTROLLER_INIT_ANGLE = False  # 是否分别使用不同的控制器初始角度
         CONTROLLER_INIT_ANGLE = -0.15 / 180 * PI
         CONTROLLER_INIT_ANGLE_LIST=[-5.71/180*PI, -1.21/180*PI, 3.29/180*PI, 0, 0, 0]
-        STEP = 0.005
+        STEP = 0.003
         DZ = 0.04
-        # # 考虑板和相机的倾斜
-        # INCLINE = False     # 是否考虑安装板和相机倾斜
-        # T_camera2flange = None  # TODO:尚未完成标定
-        # T_BOARD2BASE = None  # TODO:尚未完成标定1
 
         
     class Task:
         """任务相关配置"""
         TARGET_HOLE_IDX = 5
-        TARGET_HOLE_IDX_LIST = [0, 1, 2]  # 目标孔索引列表
+        TARGET_HOLE_IDX_LIST = [5, 0, 1, 2]*3  # 目标孔索引列表
         # TARGET_HOLE_IDX_LIST = [ 0, 1, 2, 3, 4, 5]
-        # TARGET_HOLE_IDX_LIST = [2,2,2]
+        # TARGET_HOLE_IDX_LIST = [2]*6
         TIME_SLEEP = 0.8  # 等待机械臂稳定的时间
         WAITKEY = 30  # OpenCV窗口等待时间
 
@@ -106,6 +102,9 @@ class Const:
 
         N_SLICE_ITERS = 2  # 切片迭代次数
 
+        MIN_HOLE_RADIUS = 90
+        MAX_HOLE_RADIUS = 160
+
         # USE_RADIUS_SPLIT_CALIB_HOLE = True  # 使用半径区分标定圆和hole
         USE_RADIUS_SPLIT_CALIB_HOLE = False 
         RADIUS_THRESHOLD = HOLE_RADIUS-1  # 半径阈值，单位：px
@@ -124,7 +123,8 @@ class Const:
         # YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0819.pt'
         # YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0910.pt'
         YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0914-200.pt'
-        YOLO_CONF = 0.8  # YOLO检测置信度阈值
+        YOLO_HOLE_WEIGHTS = 'yolov11s-seg-1105.pt'
+        YOLO_CONF = 0.7  # YOLO检测置信度阈值
     
     class Sam:
         MODEL_DIR = r'./models'

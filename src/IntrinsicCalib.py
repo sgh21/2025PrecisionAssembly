@@ -8,12 +8,11 @@ import matplotlib.pyplot as plt
 
 import os, sys
 workspace = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-print("workspace:", workspace)
 sys.path.append(workspace)
 
 from AuboControlLowLevel import AuboController
 from MVSControl import MVSController
-from ComputePose import ImageProcessor
+# from ComputePoseV3 import ImageProcessor
 from ConstConfig import Const
 # TODO: 待更新，需要适配新的视觉算法
 # ====== 配置参数 ======
@@ -29,6 +28,7 @@ SAVE_DIR = os.path.join(DATASET_DIR, 'intrinsic_calib')
 os.makedirs(SAVE_DIR, exist_ok=True)
 CSV_PATH = os.path.join(SAVE_DIR, 'intrinsic_calib.csv')
 TIME_SLEEP = Const.Task.TIME_SLEEP  # 等待机械臂稳定的时间
+TIME_SLEEP = 2
 JOINT_MAX_ACC = Const.Robot.JOINT_MAX_ACC
 JOINT_MAX_VELC = Const.Robot.JOINT_MAX_VELC
 END_MAX_ACC = Const.Robot.END_MAX_ACC
@@ -137,7 +137,7 @@ def main_client():
     ori = INIT_ORI
 
     robot_client.aubo.movel(INIT_POS, INIT_ORI, joint=True )
-    time.sleep(TIME_SLEEP)  # 等待机械臂稳定
+    # time.sleep(TIME_SLEEP)  # 等待机械臂稳定
 
     records = []
     for idx, pos in enumerate(positions):
@@ -200,7 +200,7 @@ def main_client():
 def main():
     # 初始化机器人和相机
     aubo = AuboController(ip=ROBOT_IP, port=ROBOT_PORT, enable_log=False)
-    img_processor = ImageProcessor(model_weights=YOLO_WEIGHTS, show=True)
+    # img_processor = ImageProcessor(model_weights=YOLO_WEIGHTS, show=True)
     mvs = MVSController()
 
     # 机器人运动参数初始化

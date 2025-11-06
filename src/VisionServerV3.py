@@ -201,8 +201,8 @@ class VisionServer:
                     t2 = cv2.getTickCount()
 
                     # 序列化数
-                    img_bytes = self.encode_img(img)
-                    result = {'status': 'success', 'result': results, 'img': img_bytes}
+                    # img_bytes = self.encode_img(img)
+                    result = {'status': 'success', 'result': results}
                     data_to_send = pickle.dumps(result)
                     # 发送数据长度
                     client_socket.sendall(len(data_to_send).to_bytes(4, byteorder='big'))
@@ -210,7 +210,7 @@ class VisionServer:
                     client_socket.sendall(data_to_send)
                     print('处理结果已发送给客户端')
                     t3 = cv2.getTickCount()
-                    print(f'YOLO处理时间：{(t2 - t1) / cv2.getTickFrequency()}s')
+                    print(f'图像处理时间：{(t2 - t1) / cv2.getTickFrequency()}s')
                     print(f'数据传输时间：{(t3 - t2) / cv2.getTickFrequency()}s')
 
                 elif obj == CALIB:
@@ -238,7 +238,7 @@ class VisionServer:
                     client_socket.sendall(data_to_send)
                     print('处理结果已发送给客户端')
                     t2 = cv2.getTickCount()
-                    print(f'YOLO处理时间：{(t4 - t1) / cv2.getTickFrequency()}s')
+                    print(f'图像处理时间：{(t4 - t1) / cv2.getTickFrequency()}s')
                     print(f'数据传输时间：{(t2 - t4) / cv2.getTickFrequency()}s')
                 
                 elif obj == GEAR:
@@ -258,8 +258,8 @@ class VisionServer:
                     t4 = cv2.getTickCount()
 
                     # 序列化数
-                    img_bytes = self.encode_img(img)
-                    result = {'status': 'success', 'result': [gear_pos, float(gear_angle)], 'img': img_bytes}
+                    # img_bytes = self.encode_img(img)
+                    result = {'status': 'success', 'result': [gear_pos, float(gear_angle)]}
                     data_to_send = pickle.dumps(result)
                     # 发送数据长度
                     client_socket.sendall(len(data_to_send).to_bytes(4, byteorder='big'))
@@ -267,8 +267,7 @@ class VisionServer:
                     client_socket.sendall(data_to_send)
                     print('处理结果已发送给客户端')
                     t2 = cv2.getTickCount()
-                    print(f'get_image处理时间：{(t3 - t1) / cv2.getTickFrequency()}s')
-                    print(f'YOLO处理时间：{(t4 - t3) / cv2.getTickFrequency()}s')
+                    print(f'图像处理时间：{(t4 - t2) / cv2.getTickFrequency()}s')
                     print(f'数据传输时间：{(t2 - t4) / cv2.getTickFrequency()}s')
 
                 else:

@@ -11,6 +11,9 @@ from copy import deepcopy
 import cv2
 from configs.ConstConfig import Const, SegmentResult
 
+MIN_HOLE_RADIUS = Const.Vision.MIN_HOLE_RADIUS
+MAX_HOLE_RADIUS = Const.Vision.MAX_HOLE_RADIUS
+
 # * : begin define utility functions
 
 def fit_circle(points):
@@ -156,8 +159,18 @@ class LocateHole:
             排序后的(center_x, center_y)列表和对应的编号列表
         """
         # 兼容传入boxes对象或xyxy数组
-        hole_seg_list = self.fliter_boxes_by_class(seg_list, target_cls = Const.ClassInfo.HOLE_CLASS)
+        hole_seg_list_all = self.fliter_boxes_by_class(seg_list, target_cls = Const.ClassInfo.HOLE_CLASS)
         
+        # 过滤半径不合理的结果
+        hole_seg_list = []
+        for seg in hole_seg_list_all:
+            x1, y1, x2, y2 = seg.xyxy_i
+            r = (x2-x1+y2-y1)/4
+            if r >= MIN_HOLE_RADIUS and r <= MAX_HOLE_RADIUS:
+                hole_seg_list.append(seg)
+            else:
+                print(f"Hole radius error：{r}")
+
         centers = []
         for seg in hole_seg_list:
             # 计算中心点
@@ -294,7 +307,7 @@ class LocateHole:
             print("\033[33mWARNING: No hole detected.\033[0m")
             return None
         
-        # 构造seg_list的中心点列表和对应的索引
+        # 过滤半径超限的圆，并构造seg_list的中心点列表和对应的索引
         centers = []
         indices = []
         for i, seg in enumerate(hole_seg_list):
@@ -946,27 +959,34 @@ class ImageProcessor:
         """ 检测齿轮位置和角度 """
 
         show_img = deepcopy(img) 
+
+        t1 = cv2.getTickCount()
         seg_list, mark_points = self.yolo_sam_predict(img)
 
         for mark in mark_points:
             cv2.circle(show_img, (mark[0], mark[1]), 5, (0, 255, 0), -1)
         
+        t2 = cv2.getTickCount()
         assert len(seg_list) > 0, "No valid segment results found"
         # 处理齿轮检测
         gear_pos, gear_angle, show_img = self.gear_locator.locate_gear(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.gear_locator else (Const.Gear.ERROR_POS, Const.Gear.ERROR_ANGLE)
         if self.show and show_img is not None:
             self._show_img(show_img, waitkey=self.waitkey)
-
+            
+        t3 = cv2.getTickCount()
+        print(f"YOLO分割时间: {(t2 - t1) / cv2.getTickFrequency():.4f} seconds")    
+        print(f"齿轮检测时间: {(t3 - t2) / cv2.getTickFrequency():.4f} seconds")
         return gear_pos, gear_angle, show_img  # 返回齿轮位置和角度 (cx, cy, radius), angle
     
     def detect_hole(self, 
                     img: np.ndarray, 
                     circle_fit_method: str = 'EdgeDrawing') -> List[Tuple[int, int, float]]:
-
         show_img = deepcopy(img) 
+        
+        t1 = cv2.getTickCount()
         seg_list = self.yolo_predict(img)
 
-        
+        t2 = cv2.getTickCount()
         assert len(seg_list) > 0, "No valid segment results found"
         # 处理孔洞检测
         hole_list, show_img = self.hole_locator.locate_hole(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.hole_locator else []
@@ -974,6 +994,9 @@ class ImageProcessor:
         if self.show and show_img is not None:
             self._show_img(show_img, waitkey=self.waitkey)
 
+        t3 = cv2.getTickCount()
+        print(f"YOLO分割时间: {(t2 - t1) / cv2.getTickFrequency():.4f} seconds")
+        print(f"孔洞检测时间: {(t3 - t2) / cv2.getTickFrequency():.4f} seconds")
         return hole_list, show_img
     
     def detect_calib_hole(self, 

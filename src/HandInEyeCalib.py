@@ -28,6 +28,7 @@ INTRINSIC_U0 = Const.Camera.INTRINSIC_U0
 INTRINSIC_A = Const.Camera.INTRINSIC_A
 
 TIME_SLEEP = Const.Task.TIME_SLEEP  # 等待机械臂稳定的时间
+TIME_SLEEP = 2
 TARGET_HOLE_IDX = Const.Task.TARGET_HOLE_IDX
 
 # CLASS INFO
@@ -69,7 +70,8 @@ class HandInEyeCalibClient(RobotClient):
             # 使用父类的move_and_detect方法精确定位到圆孔
             target_pos, target_ori = self.move_and_detect(
                 object=HOLE, 
-                target_hole_idx=target_hole_idx
+                target_hole_idx=target_hole_idx,
+                times_limit=5
             )
             
             print(f"检测到目标圆孔位置: {target_pos}")
@@ -78,9 +80,9 @@ class HandInEyeCalibClient(RobotClient):
             current_pos = self.aubo.get_current_waypoint()['pos']
             hole_pos = deepcopy(current_pos)
             pos_offset = np.array(insert_pos) - np.array(current_pos)
-            
-            print(f"\033[32m手眼标定结果（位置偏移）: {pos_offset} 米\033[0m")
-            
+
+            print(f"\033[32m手眼标定结果（位置偏移）: [{pos_offset[0]:.6f}, {pos_offset[1]:.6f}, {pos_offset[2]:.6f}] 米\033[0m")
+
             return pos_offset, hole_pos
             
         except Exception as e:
@@ -97,7 +99,7 @@ class HandInEyeCalibClient(RobotClient):
             time.sleep(TIME_SLEEP)
             
             # 使用父类的move_and_detect方法精确定位到齿轮
-            gear_pos, gear_angle = self.move_and_detect(object=GEAR, times_limit=1)
+            gear_pos, gear_angle = self.move_and_detect(object=GEAR, times_limit=3)
             
             print(f"检测到齿轮位置: {gear_pos}, 角度: {gear_angle * 180 / np.pi:.2f} deg")
             
@@ -153,11 +155,11 @@ class HandInEyeCalibClient(RobotClient):
             
             controller_angle, gear_angle, center_connection_angle = gear_result
             
-            print(f"\n\033[32m=== 手眼标定完成 ===\033[0m")
-            print(f"位置偏移: {pos_offset} 米")
+            print(f"\n\033[32m=== 手眼标定完成 ===")
+            print(f"位置偏移: [{pos_offset[0]:.6f}, {pos_offset[1]:.6f}, {pos_offset[2]:.6f}] 米")
+            print(f"控制器角度: {controller_angle * 180 / np.pi:.2f} deg\033[0m")
             print(f"齿轮角度: {gear_angle * 180 / np.pi:.2f} deg")
             print(f"中心连线角度: {center_connection_angle * 180 / np.pi:.2f} deg")
-            print(f"控制器角度: {controller_angle * 180 / np.pi:.2f} deg")
         else:
             print(f"\n\033[32m=== 手眼标定完成（跳过齿轮） ===\033[0m")
             print(f"位置偏移: {pos_offset} 米")
