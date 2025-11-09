@@ -10,6 +10,7 @@ import pickle
 import queue
 import torch
 import cv2
+import datetime
 import threading
 import numpy as np  # needed for warmup printing
 import os, sys
@@ -65,8 +66,15 @@ class VisionServer:
         self.img_queue = queue.Queue(maxsize=5)
         self.display_thread = None
         self.warmup_thread = None
+        
+        # 日志目录
+        log_root = os.path.join(workspace, 'logs')
+        now_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.log_dir = os.path.join(log_root, now_str)
+        os.makedirs(self.log_dir, exist_ok=True)
 
         print(f"Vision server started on {host}:{port}")
+        print(f"日志目录: {self.log_dir}")
 
     def init_camera(self, show = True):
         try:
@@ -275,6 +283,10 @@ class VisionServer:
                     error_data = pickle.dumps({'status': 'error', 'message': f"Unknown object: {obj}"})
                     client_socket.sendall(len(error_data).to_bytes(4, byteorder='big'))
                     client_socket.sendall(error_data)
+                if show_img is not None:
+                    save_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    save_path = os.path.join(self.log_dir, f"{save_time}.jpg")
+                    cv2.imwrite(save_path, show_img)
 
             elif client_command.get('command') == 'exit':
                 print("收到 exit 指令，关闭连接。")

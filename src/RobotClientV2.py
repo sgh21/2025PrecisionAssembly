@@ -230,7 +230,7 @@ class RobotClient:
                 print(f"{object}位置误差满足要求: {pos_error*1000:.3f}mm < {pos_error_threshold*1000:.3f}mm，停止移动")
                 break
             print(f"移动到新位置: {new_pos.tolist()}, 姿态: {new_ori}, 位置误差: {pos_error*1000:.3f}mm")
-            self.aubo.movel(new_pos.tolist(), new_ori, joint=True)
+            self.aubo.movel(new_pos.tolist(), new_ori, joint=False)
             current_pos = new_pos.tolist()
             current_ori = new_ori
 
@@ -311,17 +311,21 @@ class RobotClient:
 
         # 啮合点（靠近孔口但不进入，距离 step/2）
         engage_pos_xy = target_insert_pos[:2]
-        engage_pos = np.array([engage_pos_xy[0], engage_pos_xy[1], target_insert_pos[2] + dz / 2.0])
+        engage_pos = np.array([engage_pos_xy[0], engage_pos_xy[1], target_insert_pos[2] + dz / 3.0])
 
         # 插入点（竖直向下到孔口）
         insert_pos = deepcopy(target_insert_pos)
+
+        # 旋转点
+        rotation_pos = deepcopy(target_insert_pos)
+        rotation_ori = deepcopy([target_insert_ori[0], target_insert_ori[1], target_insert_ori[2] - Const.Task.ROTATION_ANGLE])
 
         # 插入点上方安全点
         safe_pos = np.array([target_insert_pos[0], target_insert_pos[1], target_insert_pos[2] + dz])
 
         # 将所有点添加到列表中
-        target_insert_pos_list.extend([pre_pos.tolist(), engage_pos.tolist(), insert_pos.tolist(), safe_pos.tolist()])
-        target_insert_ori_list.extend([target_insert_ori] * 4)
+        target_insert_pos_list.extend([pre_pos.tolist(), engage_pos.tolist(), insert_pos.tolist(), rotation_pos.tolist(), safe_pos.tolist()])
+        target_insert_ori_list.extend([target_insert_ori, target_insert_ori, target_insert_ori, rotation_ori, rotation_ori])
 
         return target_insert_pos_list, target_insert_ori_list
     
@@ -356,7 +360,7 @@ class RobotClient:
             Delta_X = -np.linalg.inv(A).dot(U - U0)/1000
             new_pos = np.array(current_pos) + np.array([Delta_X[0], Delta_X[1], 0])
             new_ori = current_ori  # 姿态保持不变
-            robot_client.aubo.movel(new_pos.tolist(), new_ori, joint=True)
+            robot_client.aubo.movel(new_pos.tolist(), new_ori, joint=False)
 
         gear_angle_result = {}
         t1 = threading.Thread(target=thread_detect_gear, args=(self, gear_angle_result))
@@ -396,7 +400,7 @@ class RobotClient:
        
         print("圆孔插入完成，回到初始位置。")
         self.set_robot_mode('fast')
-        self.aubo.movel(init_pos, init_ori, joint=True)
+        self.aubo.movel(init_pos, init_ori, joint=False)
 
         return gear_pos, gear_angle
 
@@ -414,7 +418,7 @@ def main():
     gear_pos , gear_angle, gear_flag_str = None, None, 'n'
 
     # 全局拍照，记录各孔粗位置
-    robot_client.aubo.movel(ROBOT_INIT_POS, ROBOT_INIT_ORI, joint=True)  # 回到初始位置
+    robot_client.aubo.movel(ROBOT_INIT_POS, ROBOT_INIT_ORI, joint=False)  # 回到初始位置
 
     input("按回车开始检测: ")
     hole_pos_list = robot_client.detect(object=HOLE, target_hole_idx=[0,1,2,3,4,5])

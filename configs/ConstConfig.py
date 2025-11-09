@@ -22,18 +22,22 @@ class Const:
         CALIB_ORI = [PI, 0, -PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
         
         # HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.20] # 手眼标定位置 [x, y, z] 单位: m
-        JOINT_MAX_ACC = [0.3] * 6
-        JOINT_MAX_VELC = [0.3] * 6
-        END_MAX_ACC = 0.3
-        END_MAX_VELC = 0.3
-        JOINT_STABLE_ACC = [0.10] * 6
-        JOINT_STABLE_VELC = [0.10] * 6
-        END_STABLE_ACC = 0.10
-        END_STABLE_VELC = 0.10
-        JOINT_INSERT_ACC = [0.02] * 6  # 插入时的关节最大加速度
-        JOINT_INSERT_VELC = [0.02] * 6
-        END_INSERT_ACC = 0.02  # 插入时的末端最大加速度
-        END_INSERT_VELC = 0.02
+
+        MAX_SPEED = 0.5 
+        JOINT_MAX_ACC = [MAX_SPEED] * 6
+        JOINT_MAX_VELC = [MAX_SPEED] * 6
+        END_MAX_ACC = MAX_SPEED
+        END_MAX_VELC = MAX_SPEED
+        STABLE_SPEED = 0.10
+        JOINT_STABLE_ACC = [STABLE_SPEED] * 6
+        JOINT_STABLE_VELC = [STABLE_SPEED] * 6
+        END_STABLE_ACC = STABLE_SPEED
+        END_STABLE_VELC = STABLE_SPEED
+        INSERT_SPEED = 0.03
+        JOINT_INSERT_ACC = [INSERT_SPEED] * 6  # 插入时的关节最大加速度
+        JOINT_INSERT_VELC = [INSERT_SPEED] * 6
+        END_INSERT_ACC = INSERT_SPEED  # 插入时的末端最大加速度
+        END_INSERT_VELC = INSERT_SPEED
         POSE_ERROR_THRESHOLD = 5 * 1e-5  # 位置误差阈值（米） 0.05mm
         # CONTROLLER_INIT_ANGLE = 0.8728294 / 180 * PI  # 控制器初始角度，单位：deg
         USE_SEPARATE_HAND_IN_EYE_OFFSET = True # 每个孔使用各自的手眼标定结果
@@ -62,11 +66,12 @@ class Const:
     class Task:
         """任务相关配置"""
         TARGET_HOLE_IDX = 5
-        TARGET_HOLE_IDX_LIST = [5, 0, 1, 2]*3  # 目标孔索引列表
+        TARGET_HOLE_IDX_LIST = [5, 0, 1, 2]  # 目标孔索引列表
         # TARGET_HOLE_IDX_LIST = [ 0, 1, 2, 3, 4, 5]
         # TARGET_HOLE_IDX_LIST = [2]*6
         TIME_SLEEP = 0.8  # 等待机械臂稳定的时间
         WAITKEY = 30  # OpenCV窗口等待时间
+        ROTATION_ANGLE = 50/180*PI  # 每次旋转角度，单位：rad
 
     class Camera:
         IMG_SHAPE_SHOW = (1024, 1536, 3)
