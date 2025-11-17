@@ -142,6 +142,11 @@ class RobotClient:
             self.aubo.set_joint_maxvelc(Const.Robot.JOINT_INSERT_VELC)
             self.aubo.set_end_speed(Const.Robot.END_INSERT_VELC)
             self.aubo.set_end_acc(Const.Robot.END_INSERT_ACC)
+        elif mode == 'spin':
+            self.aubo.set_joint_maxacc(Const.Robot.JOINT_SPIN_ACC)
+            self.aubo.set_joint_maxvelc(Const.Robot.JOINT_SPIN_VELC)
+            self.aubo.set_end_speed(Const.Robot.END_SPIN_VELC)
+            self.aubo.set_end_acc(Const.Robot.END_SPIN_ACC)
         else:
             raise ValueError(f"Unsupported mode: {mode}")
     
@@ -311,7 +316,7 @@ class RobotClient:
 
         # 啮合点（靠近孔口但不进入，距离 step/2）
         engage_pos_xy = target_insert_pos[:2]
-        engage_pos = np.array([engage_pos_xy[0], engage_pos_xy[1], target_insert_pos[2] + dz / 3.0])
+        engage_pos = np.array([engage_pos_xy[0], engage_pos_xy[1], target_insert_pos[2] + dz / 4.0])
 
         # 插入点（竖直向下到孔口）
         insert_pos = deepcopy(target_insert_pos)
@@ -391,8 +396,12 @@ class RobotClient:
         for pos, ori in zip(target_insert_pos_list, target_insert_ori_list):
             waypoint_cnt += 1
             if waypoint_cnt == 2:
+                self.set_robot_mode('stable')
+            elif waypoint_cnt == 3:
                 self.set_robot_mode('insert')
             elif waypoint_cnt == 4:
+                self.set_robot_mode('spin')
+            elif waypoint_cnt == 5:
                 self.set_robot_mode('fast')
             print(f"插入位置: {pos}, 姿态: {ori}")
             self.aubo.movel(pos, ori, joint=False)

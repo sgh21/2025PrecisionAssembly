@@ -19,8 +19,10 @@ HAND_IN_EYE_OFFSET = Const.Robot.HAND_IN_EYE_OFFSET
 GEAR_POS = [GEAR_POS[0]+HAND_IN_EYE_OFFSET[0], GEAR_POS[1]+HAND_IN_EYE_OFFSET[1], GEAR_POS[2]]
 CALIB_POS = [CALIB_POS[0]+HAND_IN_EYE_OFFSET[0], CALIB_POS[1]+HAND_IN_EYE_OFFSET[1], CALIB_POS[2]]
 
-RADIUS = 0.08
-OFFSET = 0.01
+CAPTURE_TIMES = [3, 5]
+
+RADIUS = 0.05   # 采样圆半径
+OFFSET = 0.01   # 位置偏移的标准差
 
 positions = [CALIB_POS,
              GEAR_POS]
@@ -31,6 +33,7 @@ for i in range(6):
     y = GEAR_POS[1] + RADIUS * np.sin(theta)
     z = GEAR_POS[2]
     positions.append([x, y, z])
+    CAPTURE_TIMES.append(1)
 
 print("采集位置：", positions)
 
@@ -42,17 +45,19 @@ if __name__ == "__main__":
     img_dir = './capture_data/'
     os.makedirs(img_dir, exist_ok=True)
 
+    input("按回车键开始采集数据...")
     # 每个对象附近分别采样
-    for pos in positions:
+    for i, pos in enumerate(positions):
         print(f"在目标位置采样: {pos}")
-        for i in range(5):
+        for j in range(CAPTURE_TIMES[i]):
             camera_pos = pos.copy()
             target_ori = INIT_ORI.copy()
             camera_pos[0] += np.random.randn() * OFFSET
             camera_pos[1] += np.random.randn() * OFFSET
 
             # target_ori[2] = np.random.uniform(-np.pi, 0)
-            ori_offset = np.random.uniform(-np.pi/2, np.pi/2)
+            
+            ori_offset = np.random.uniform(-np.pi/4, np.pi/4)
             target_ori[2] += ori_offset
 
             # 解算机械臂末端位置

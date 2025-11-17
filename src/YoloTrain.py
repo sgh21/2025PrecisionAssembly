@@ -10,7 +10,8 @@ data_dir = os.path.join(workspace, 'documents', 'dataset')
 
 if __name__ == "__main__":
     # Load a model
-    model = YOLO("yolo11s-seg.yaml")#.load(weights=workspace+'/models/yolov11s-seg-0803.pt')  # build a new model from scratch
+    # model = YOLO("yolo11s-seg.yaml")
+    model = YOLO("yolo11s-seg.yaml")#.load(weights=workspace+'/models/yolov11s-seg-1113.pt')  # build a new model from scratch
     # model = YOLO("yolov8n-seg.pt")  # load a pretrained model (recommended for training)
 
     # 设置数据增强参数
@@ -26,14 +27,14 @@ if __name__ == "__main__":
         'scale': 0.3,
         'shear': 0.0,
         'perspective': 0.0,
-        'flipud': 0.2,
+        'flipud': 0.5,
         'fliplr': 0.5,
         'copy_paste': 0.0
     }
    
     # Use the model
     model.train(
-        data=f"{data_dir}/1105/config.yaml", 
+        data=f"{data_dir}/1113/config.yaml", 
         epochs=200,
         batch = 12,
         workers = 16,

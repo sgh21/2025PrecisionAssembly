@@ -58,8 +58,8 @@ class HoleInsertClient(RobotClient):
             # 移动到初始位置
             init_pos = deepcopy(ROBOT_INIT_POS)
             init_ori = deepcopy(ROBOT_INIT_ORI)
-            self.set_robot_mode('stable')
-            self.aubo.movel(init_pos, init_ori, joint=True)
+            self.set_robot_mode('fast')
+            self.aubo.movel(init_pos, init_ori, joint=False)
             time.sleep(TIME_SLEEP)
             
             # 使用父类的move_and_detect方法移动到目标位置

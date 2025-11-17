@@ -16,9 +16,9 @@ class Const:
         # CALIB_POS = [0.48885, -0.079199, 0.236420]  # 校准位置 [x, y, z] 单位: m
         # CALIB_ORI = [PI, 0, PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
 
-        INIT_POS = [-0.377183, -0.068571, 0.236420]  # 初始位置 [x, y, z] 单位: m
+        INIT_POS = [-0.3765, -0.0686, 0.2372]  # 初始位置 [x, y, z] 单位: m
         INIT_ORI = [PI, 0, -PI/2]  # 初始姿态 [roll, pitch, yaw] 单位: rad
-        CALIB_POS = [-0.38, -0.1576, 0.236420]
+        CALIB_POS = [-0.3830, -0.1584, 0.2372]
         CALIB_ORI = [PI, 0, -PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
         
         # HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.20] # 手眼标定位置 [x, y, z] 单位: m
@@ -38,15 +38,20 @@ class Const:
         JOINT_INSERT_VELC = [INSERT_SPEED] * 6
         END_INSERT_ACC = INSERT_SPEED  # 插入时的末端最大加速度
         END_INSERT_VELC = INSERT_SPEED
+        SPIN_SPEED = 2.0
+        JOINT_SPIN_ACC = [SPIN_SPEED] * 6
+        JOINT_SPIN_VELC = [SPIN_SPEED] * 6
+        END_SPIN_ACC = SPIN_SPEED
+        END_SPIN_VELC = SPIN_SPEED
         POSE_ERROR_THRESHOLD = 5 * 1e-5  # 位置误差阈值（米） 0.05mm
         # CONTROLLER_INIT_ANGLE = 0.8728294 / 180 * PI  # 控制器初始角度，单位：deg
-        USE_SEPARATE_HAND_IN_EYE_OFFSET = True # 每个孔使用各自的手眼标定结果
+        USE_SEPARATE_HAND_IN_EYE_OFFSET = False # 每个孔使用各自的手眼标定结果
         # 比赛
         # X_OFFSET = -0.11  # 相机X轴偏移量（米） -2.0147132317361707
         # HAND_IN_EYE_OFFSET = [0.10967375, 0.00199195, -0.155]
         # 实验室
         X_OFFSET = 0.11  # 相机X轴偏移量（米） -2.0147132317361707
-        HAND_IN_EYE_OFFSET = [-0.11344396, 0.00027828, -0.150]
+        HAND_IN_EYE_OFFSET = [-0.113415, 0.000252, -0.150]
         HAND_IN_EYE_OFFSET_LIST = [
             [-0.113401, 0.000239, -0.150],
             [-0.11344449, 0.00047502, -0.150],
@@ -57,7 +62,7 @@ class Const:
         ]
 
         SEPARATE_CONTROLLER_INIT_ANGLE = False  # 是否分别使用不同的控制器初始角度
-        CONTROLLER_INIT_ANGLE = -0.15 / 180 * PI
+        CONTROLLER_INIT_ANGLE = -0.94 / 180 * PI
         CONTROLLER_INIT_ANGLE_LIST=[-5.71/180*PI, -1.21/180*PI, 3.29/180*PI, 0, 0, 0]
         STEP = 0.003
         DZ = 0.04
@@ -66,7 +71,7 @@ class Const:
     class Task:
         """任务相关配置"""
         TARGET_HOLE_IDX = 5
-        TARGET_HOLE_IDX_LIST = [5, 0, 1, 2]  # 目标孔索引列表
+        TARGET_HOLE_IDX_LIST = [0, 1, 2]  # 目标孔索引列表
         # TARGET_HOLE_IDX_LIST = [ 0, 1, 2, 3, 4, 5]
         # TARGET_HOLE_IDX_LIST = [2]*6
         TIME_SLEEP = 0.8  # 等待机械臂稳定的时间

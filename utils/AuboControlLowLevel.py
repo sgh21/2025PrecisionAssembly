@@ -216,7 +216,9 @@ if __name__== "__main__":
     init_pos[2] -= hand_in_eye_offset[2]
     init_ori = deepcopy(current_rpy)
 
-    input(f'目标姿态:pos {init_pos}, 姿态: {init_ori}，按下任意键继续...')
+    input(f'当前姿态:pos {current_pos}, ori: {current_rpy}，按下任意键继续...')
+    input(f'目标姿态:pos {init_pos}, ori: {init_ori}，按下任意键继续...')
     aubo.movel(init_pos, init_ori, joint=False )
-    print(f"移动到目标姿态: {init_pos}, 姿态: {init_ori}")
+    print(f"移动到目标姿态: {init_pos}, ori: {init_ori}")
+    print(f"\033[1;32mZ轴标定结果：\n初始Z：{init_pos[2]}，偏移量：{init_pos[2]-current_pos[2]}\033[0m")
     aubo.disconnect()
