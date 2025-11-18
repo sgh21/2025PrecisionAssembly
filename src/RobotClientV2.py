@@ -464,6 +464,8 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         print(f"发生错误: {e}")
+        import traceback
+        traceback.print_exc()
     finally:
         cv2.destroyAllWindows()
         print("齿轮配合任务完成，程序结束。")

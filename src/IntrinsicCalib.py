@@ -136,14 +136,14 @@ def main_client():
     positions = generate_plane_positions(INIT_POS, PLANE_AXIS, STEP, GRID_SIZE)
     ori = INIT_ORI
 
-    robot_client.aubo.movel(INIT_POS, INIT_ORI, joint=True )
+    robot_client.aubo.movel(INIT_POS, INIT_ORI, joint=False )
     # time.sleep(TIME_SLEEP)  # 等待机械臂稳定
 
     records = []
     for idx, pos in enumerate(positions):
         print(f"[{idx+1}/{GRID_SIZE * GRID_SIZE}] 移动到位置: {pos}")
         try:
-            robot_client.aubo.movel(pos, ori, joint=True)
+            robot_client.aubo.movel(pos, ori, joint=False)
             time.sleep(TIME_SLEEP)  # 等待机械臂稳定
 
             circle, img = robot_client.detect(object=CALIB)
@@ -194,7 +194,7 @@ def main_client():
     print(f"所有数据已保存到: {CSV_PATH}")
 
     fit_intrinsic_params(df, SAVE_DIR)
-    robot_client.aubo.movel(INIT_POS, INIT_ORI, joint=True )
+    robot_client.aubo.movel(INIT_POS, INIT_ORI, joint=False )
     robot_client.disconnect()
 
 def main():
@@ -214,13 +214,13 @@ def main():
     positions = generate_plane_positions(INIT_POS, PLANE_AXIS, STEP, GRID_SIZE)
     ori = INIT_ORI
 
-    aubo.movel(INIT_POS, INIT_ORI, joint=True )
+    aubo.movel(INIT_POS, INIT_ORI, joint=False )
     time.sleep(TIME_SLEEP)  # 等待机械臂稳定
     records = []
     for idx, pos in enumerate(positions):
         print(f"[{idx+1}/{GRID_SIZE * GRID_SIZE}] 移动到位置: {pos}")
         try:
-            aubo.movel(pos, ori, joint=True)
+            aubo.movel(pos, ori, joint=False)
             time.sleep(TIME_SLEEP)  # 等待机械臂稳定
             # 如果需要多次采集同一位置的图像
             img = mvs.get_image(debug=True)

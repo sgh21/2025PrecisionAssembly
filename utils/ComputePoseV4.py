@@ -9,7 +9,16 @@ import numpy as np
 from typing import List, Tuple
 from copy import deepcopy
 import cv2
+import os, sys
+sys.path.append((os.path.dirname(os.path.dirname(__file__))))
+
 from configs.ConstConfig import Const, SegmentResult
+from src.SAMTest import generate_prompt
+
+GEAR_CLASS = Const.ClassInfo.GEAR_CLASS
+KEYHOLE_CLASS = Const.ClassInfo.KEYHOLE_CLASS
+HOLE_CLASS = Const.ClassInfo.HOLE_CLASS
+CALIB_CLASS = Const.ClassInfo.CALIB_CLASS
 
 MIN_HOLE_RADIUS = Const.Vision.MIN_HOLE_RADIUS
 MAX_HOLE_RADIUS = Const.Vision.MAX_HOLE_RADIUS
@@ -134,7 +143,6 @@ class LocateHole:
         返回:
             筛选后的边界框列表
         """
-
         target_list = []
         for seg in seg_list:
             if seg.class_name == target_cls:
@@ -275,7 +283,7 @@ class LocateHole:
                               circles: List[Tuple[float, float, float]],
                               radius )-> List[Tuple[float, float, float]]:
                         # 使用半径在80像素做初步筛选
-        heuristic_circles = [c for c in circles if abs(c[2]-radius)<10]
+        heuristic_circles = [c for c in circles if abs(c[2]-radius)<50]
         if len(heuristic_circles) > 0:
             circles = heuristic_circles
         else:
@@ -301,37 +309,42 @@ class LocateHole:
     def locate_hole(self,
                 seg_list:List[SegmentResult], 
                 show_img: np.ndarray = None,
-                circle_fit_method:str = 'EdgeDrawing'):
-        hole_seg_list = self.fliter_boxes_by_expected_num(seg_list, expected_num=6)
-        if len(hole_seg_list) == 0:
-            print("\033[33mWARNING: No hole detected.\033[0m")
-            return None
-        
-        # 过滤半径超限的圆，并构造seg_list的中心点列表和对应的索引
-        centers = []
-        indices = []
-        for i, seg in enumerate(hole_seg_list):
-            # 计算中心点
-            x1, y1, x2, y2 = seg.xyxy_i
-            cx = (x1 + x2) / 2
-            cy = (y1 + y2) / 2
-            centers.append((cx, cy))
-            indices.append(i)
-        
-        if len(centers) < 6 :
-            centers, indices = self.complete_hexagon(centers, indices)
+                circle_fit_method:str = 'EdgeDrawing',
+                classes='all'):
 
-        # 对六边形分布的圆孔进行排序
-        sorted_centers, sorted_indices = self.sort_hexagon_centers(centers, indices)
+        if classes == 'all':
+            hole_seg_list = self.fliter_boxes_by_expected_num(seg_list, expected_num=6)
+            if len(hole_seg_list) == 0:
+                print("\033[33mWARNING: No hole detected.\033[0m")
+                return None
+            
+            # 过滤半径超限的圆，并构造seg_list的中心点列表和对应的索引
+            centers = []
+            indices = []
+            for i, seg in enumerate(hole_seg_list):
+                # 计算中心点
+                x1, y1, x2, y2 = seg.xyxy_i
+                cx = (x1 + x2) / 2
+                cy = (y1 + y2) / 2
+                centers.append((cx, cy))
+                indices.append(i)
+            
+            if len(centers) < 6 :
+                centers, indices = self.complete_hexagon(centers, indices)
 
-        # 根据sorted_indices重新排序hole_seg_list
-        sorted_hole_seg_list = []
-        for i in sorted_indices:
-            if i < 0:
-                sorted_hole_seg_list.append(None)  # -1表示缺失点
-            else:
-                sorted_hole_seg_list.append(hole_seg_list[i])
-        
+            # 对六边形分布的圆孔进行排序
+            sorted_centers, sorted_indices = self.sort_hexagon_centers(centers, indices)
+
+            # 根据sorted_indices重新排序hole_seg_list
+            sorted_hole_seg_list = []
+            for i in sorted_indices:
+                if i < 0:
+                    sorted_hole_seg_list.append(None)  # -1表示缺失点
+                else:
+                    sorted_hole_seg_list.append(hole_seg_list[i])
+        if classes == 'hole':
+            sorted_hole_seg_list = self.fliter_boxes_by_class(seg_list, HOLE_CLASS)
+
         hole_list = []
         for i, seg in enumerate(sorted_hole_seg_list):
             if seg is None:
@@ -764,58 +777,76 @@ class ImageProcessor:
                 mask = masks[i]
             ))
         return seg_list
-    
-    def yolo_sam_predict(self, img: np.ndarray) -> List[SegmentResult]:
+
+    def yolo_sam_predict(self, img: np.ndarray, classes = 'all') -> Tuple[List[SegmentResult], List[np.ndarray]]:
         '''
         用于检测齿轮位置，有线使用yolo，在检测失效情况下使用sam辅助检测
+            img: 输入图像
+            classes:    all :检测所有类型
+                        calib:只检测calib
+                        gear:只检测gear, keyhole
+                        hole:只检测视野中心的hole
         '''
         mark_points = []
-        results = self.yolo_model.predict(img, retina_masks = True, conf = Const.Yolo.YOLO_CONF)
-        if len(results) == 0 or results[0].masks==None:
-            print("No valid detection results found.")
-            return Const.Gear.ERROR_POS+(0,), []
-        
-        if self.show:
-            img_show = results[0].plot()  # 获取可视化结果
-            cv2.namedWindow("YOLO Result", cv2.WINDOW_NORMAL)
-            cv2.resizeWindow("YOLO Result", Const.Camera.IMG_SHAPE_SHOW[1], Const.Camera.IMG_SHAPE_SHOW[0])  # 你想要的尺寸
-            cv2.imshow("YOLO Result", img_show)
-            cv2.waitKey(self.waitkey)  # 等待按键事件，0表示无限等待
-
-        boxes = results[0].boxes.xyxy.cpu().numpy()
-        masks = results[0].masks.data.cpu().numpy()
-        classes = results[0].boxes.cls.cpu().numpy().astype(int)
         seg_list:List[SegmentResult] = []
-        for i in range(len(boxes)):
-            # 创建SegmentResult对象 
-            # 每个对象会根据yolo检测结果进行裁剪 local_img_i
-            # 并分别根据局部图像和原图像进行边缘检测 
-            seg_list.append(SegmentResult(
-                img = img,
-                class_id = classes[i].item(),
-                box = boxes[i],
-                mask = masks[i]
-            ))
+
+        if classes == 'all' or classes == 'gear' or classes == 'calib':
+            results = self.yolo_model.predict(img, retina_masks = True, conf = Const.Yolo.YOLO_CONF)
+            if len(results) == 0 or results[0].masks==None:
+                print("No valid detection results found.")
+                return Const.Gear.ERROR_POS+(0,), []
             
-            # ### 测试SAM对keyhole分割效果，注释则在YOLO失效时才使用SAM
-            # if seg_list[-1].class_name == Const.ClassInfo.KEYHOLE_CLASS:
-            #     seg_list.pop()  # 删除yolo检测到的keyhole
-            # ###
-        has_gear = any([seg.class_name == Const.ClassInfo.GEAR_CLASS for seg in seg_list])
-        has_keyhole = any([seg.class_name == Const.ClassInfo.KEYHOLE_CLASS for seg in seg_list])
-        if has_gear and not has_keyhole:
-            gear_seg = [seg for seg in seg_list if seg.class_name == Const.ClassInfo.GEAR_CLASS][0]
-            x1, y1, x2, y2 = gear_seg.xyxy_i
-            center = [(x1+x2)/2, (y1+y2)/2]  # 中心点
-            radius_a = (x2-x1+y2-y1)/4 # 齿顶半径估计值
-            radius_mark = radius_a / Const.Gear.PEAK_RADIUS * Const.Gear.KEYHOLE_MARK_RADIUS #SAM标记点的半径估计值
-            for angle in [0, np.pi/3, 2*np.pi/3, np.pi, 4*np.pi/3, 5*np.pi/3]:
-                px = int(center[0] + radius_mark * np.cos(angle))
-                py = int(center[1] + radius_mark * np.sin(angle))
-                mark_points.append((px, py))  # 1表示前景点
-            point_coords = np.array(mark_points)
-            point_labels = np.array([1]*len(mark_points))  # 1 for foreground
+            if self.show:
+                img_show = results[0].plot()  # 获取可视化结果
+                cv2.namedWindow("YOLO Result", cv2.WINDOW_NORMAL)
+                cv2.resizeWindow("YOLO Result", Const.Camera.IMG_SHAPE_SHOW[1], Const.Camera.IMG_SHAPE_SHOW[0])  # 你想要的尺寸
+                cv2.imshow("YOLO Result", img_show)
+                cv2.waitKey(self.waitkey)  # 等待按键事件，0表示无限等待
+
+            boxes = results[0].boxes.xyxy.cpu().numpy()
+            masks = results[0].masks.data.cpu().numpy()
+            class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
+            for i in range(len(boxes)):
+                # 创建SegmentResult对象 
+                # 每个对象会根据yolo检测结果进行裁剪 local_img_i
+                # 并分别根据局部图像和原图像进行边缘检测 
+
+                seg_list.append(SegmentResult(
+                    img = img,
+                    class_id = class_ids[i].item(),
+                    box = boxes[i],
+                    mask = masks[i]
+                ))
+                if seg_list[-1].class_name == KEYHOLE_CLASS or seg_list[-1].class_name == HOLE_CLASS:
+                    seg_list.pop()  # 删除yolo检测到的keyhole和hole
+
+            has_gear = any([seg.class_name == GEAR_CLASS for seg in seg_list])
+            
             self.model.set_image(img)
+            if not has_gear:
+                point_coords, point_labels = generate_prompt(img.shape, GEAR_CLASS)
+                masks, scores, logits = self.model.predict(
+                    point_coords=point_coords,
+                    point_labels=point_labels,
+                    multimask_output=False,
+                )
+                mask = masks[0]
+                box = np.array([np.min(np.where(mask)[1]), np.min(np.where(mask)[0]), np.max(np.where(mask)[1]), np.max(np.where(mask)[0])])  # x1, y1, x2, y2
+                seg_list.append(SegmentResult(
+                    img=img,
+                    class_id=GEAR_CLASS,
+                    box=box,
+                    mask=mask
+                ))
+                for p in point_coords:
+                    mark_points.append(p)
+
+        if classes == 'all' or classes == 'gear':
+            gear_seg = [seg for seg in seg_list if seg.class_name == GEAR_CLASS][0]
+            x1, y1, x2, y2 = gear_seg.xyxy_i
+            gear_pos = ((x1 + x2) / 2, (y1 + y2) / 2)
+            # 生成keyhole类
+            point_coords, point_labels = generate_prompt(img.shape, KEYHOLE_CLASS, gear_pos=gear_pos)
             masks, scores, logits = self.model.predict(
                 point_coords=point_coords,
                 point_labels=point_labels,
@@ -825,11 +856,53 @@ class ImageProcessor:
             box = np.array([np.min(np.where(mask)[1]), np.min(np.where(mask)[0]), np.max(np.where(mask)[1]), np.max(np.where(mask)[0])])  # x1, y1, x2, y2
             seg_list.append(SegmentResult(
                 img=img,
-                class_id=Const.ClassInfo.KEYHOLE_CLASS,
+                class_id=KEYHOLE_CLASS,
                 box=box,
                 mask=mask
             ))
-            
+            for p in point_coords:
+                mark_points.append(p)
+
+            if classes == 'all':
+                # 生成hole类
+                point_coords, point_labels = generate_prompt(img.shape, HOLE_CLASS, gear_pos=gear_pos)
+                for i in range(6):
+                    masks, scores, logits = self.model.predict(
+                        point_coords=point_coords[i:i+1],
+                        point_labels=point_labels[i:i+1],
+                        multimask_output=False,
+                    )
+                    mask = masks[0]
+                    box = np.array([np.min(np.where(mask)[1]), np.min(np.where(mask)[0]), np.max(np.where(mask)[1]), np.max(np.where(mask)[0])])  # x1, y1, x2, y2
+                    seg_list.append(SegmentResult(
+                        img=img,
+                        class_id=HOLE_CLASS,
+                        box=box,
+                        mask=mask
+                    ))
+                for p in point_coords:
+                    mark_points.append(p)
+
+        if classes == 'hole':
+            # 仅检测视野中心的hole
+            self.model.set_image(img)
+            point_coords, point_labels = generate_prompt(img.shape, HOLE_CLASS, center=True)
+            masks, scores, logits = self.model.predict(
+                point_coords=point_coords,
+                point_labels=point_labels,
+                multimask_output=False,
+            )
+            mask = masks[0]
+            box = np.array([np.min(np.where(mask)[1]), np.min(np.where(mask)[0]), np.max(np.where(mask)[1]), np.max(np.where(mask)[0])])  # x1, y1, x2, y2
+            seg_list.append(SegmentResult(
+                img=img,
+                class_id=HOLE_CLASS,
+                box=box,
+                mask=mask
+            ))
+            for p in point_coords:
+                mark_points.append(p)
+                
 
         return seg_list, mark_points
     
@@ -851,31 +924,10 @@ class ImageProcessor:
         
         return result
 
-    def sam_predict(self, 
-                    img: np.ndarray, 
-                    mark_points:List[Tuple[int,int,int]],
-                    class_ids:List[int]) -> np.ndarray:
+    def sam_predict(self, img: np.ndarray, classes=[HOLE_CLASS]) -> np.ndarray:
         self.model.set_image(img)
         seg_list=[]
-        for i in range(len(mark_points)):
-            point_coords = np.array([[mark_points[i][0], mark_points[i][1]]])
-            point_labels = np.array([mark_points[i][2]])  # 1 for foreground
-            masks, scores, logits = self.model.predict(
-                point_coords=point_coords,
-                point_labels=point_labels,
-                multimask_output=False,
-            )
-            mask = masks[0]
-            box = np.array([np.min(np.where(mask)[1]), np.min(np.where(mask)[0]), np.max(np.where(mask)[1]), np.max(np.where(mask)[0])])  # x1, y1, x2, y2
-            seg_list.append(SegmentResult(
-                img=img,
-                class_id=class_ids[i],
-                box=box,
-                mask=mask
-            ))
-            img_res = self.visualize_sam_result(img, box, mask)
-            img_res = cv2.resize(img_res, (Const.Camera.IMG_SHAPE_SHOW[1]//2, Const.Camera.IMG_SHAPE_SHOW[0]//2))
-            cv2.imshow("SAM Result", img_res)
+        
         return seg_list
     
     @ staticmethod
@@ -916,6 +968,23 @@ class ImageProcessor:
         # cv2.putText(show_img, f"Detected {gear_num} gears, {keyhole_num} keyholes, {hole_num} holes, {calib_num} calib holes.", (120, 140), cv2.FONT_HERSHEY_SIMPLEX, 2.0, (255, 0, 0), 5)
 
         assert len(seg_list) > 0, "No valid segment results found"
+        # # 逐个绘制分割结果
+        # for seg in seg_list:
+        #     result = show_img.copy()
+        #     mask = seg.mask.astype(bool)
+        #     # 创建彩色掩码覆盖层
+        #     colored_mask = np.zeros_like(show_img)
+        #     colored_mask[mask] = [0, 255, 0]  # 绿色掩码
+        #     # 添加半透明掩码覆盖
+        #     result = cv2.addWeighted(result, 0.7, colored_mask, 0.3, 0)
+        #     # 绘制掩码轮廓
+        #     mask_uint8 = (mask * 255).astype(np.uint8)
+        #     contours, _ = cv2.findContours(mask_uint8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        #     cv2.drawContours(result, contours, -1, (0, 255, 0), 2)
+        #     result = cv2.resize(result, (result.shape[1]//2, result.shape[0]//2))
+        #     cv2.imshow("Segment Visualization", result)
+        #     cv2.waitKey(0)  # 等待按键事件，0表示无限
+            
 
         # 处理齿轮检测
         try:
@@ -963,7 +1032,7 @@ class ImageProcessor:
         show_img = deepcopy(img) 
 
         t1 = cv2.getTickCount()
-        seg_list, mark_points = self.yolo_sam_predict(img)
+        seg_list, mark_points = self.yolo_sam_predict(img, classes='gear')
 
         for mark in mark_points:
             cv2.circle(show_img, (mark[0], mark[1]), 5, (0, 255, 0), -1)
@@ -982,16 +1051,17 @@ class ImageProcessor:
     
     def detect_hole(self, 
                     img: np.ndarray, 
+                    classes = 'all',
                     circle_fit_method: str = 'EdgeDrawing') -> List[Tuple[int, int, float]]:
         show_img = deepcopy(img) 
         
         t1 = cv2.getTickCount()
-        seg_list = self.yolo_predict(img)
+        seg_list, mark_points = self.yolo_sam_predict(img, classes=classes)
 
         t2 = cv2.getTickCount()
         assert len(seg_list) > 0, "No valid segment results found"
         # 处理孔洞检测
-        hole_list, show_img = self.hole_locator.locate_hole(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.hole_locator else []
+        hole_list, show_img = self.hole_locator.locate_hole(seg_list=seg_list, show_img=show_img, classes=classes, circle_fit_method=circle_fit_method) if self.hole_locator else []
 
         if self.show and show_img is not None:
             self._show_img(show_img, waitkey=self.waitkey)
@@ -1006,7 +1076,7 @@ class ImageProcessor:
                           circle_fit_method: str = 'EdgeDrawing') -> Tuple[float, float, float]:
 
         show_img = deepcopy(img) 
-        seg_list = self.yolo_predict(img)
+        seg_list, mark_points = self.yolo_sam_predict(img, classes='calib')
 
         assert len(seg_list) > 0, "No valid segment results found"
 
@@ -1111,7 +1181,7 @@ def vision_test():
     model_weights = Const.Yolo.YOLO_HOLE_WEIGHTS
 
     # 检查模型权重
-    model_weights_path = os.path.join(Const.Yolo.MODEL_DIE, model_weights)
+    model_weights_path = os.path.join(Const.Yolo.MODEL_DIR, model_weights)
     image_processor = ImageProcessor(model_weights=model_weights_path, show=True, waitkey = 20)
     mvs_control = MVSController()
 

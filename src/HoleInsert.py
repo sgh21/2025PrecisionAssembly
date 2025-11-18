@@ -34,6 +34,9 @@ ROBOT_INIT_POS = Const.Robot.INIT_POS
 ROBOT_INIT_ORI = Const.Robot.INIT_ORI
 HAND_IN_EYE_OFFSET = Const.Robot.HAND_IN_EYE_OFFSET
 
+INTRINSIC_U0 = Const.Camera.INTRINSIC_U0
+INTRINSIC_A = Const.Camera.INTRINSIC_A
+
 DZ = Const.Robot.DZ  # 插入时的Z轴偏移量
 # CLASS INFO
 HOLE = Const.ClassInfo.HOLE_CLASS
@@ -61,11 +64,28 @@ class HoleInsertClient(RobotClient):
             self.set_robot_mode('fast')
             self.aubo.movel(init_pos, init_ori, joint=False)
             time.sleep(TIME_SLEEP)
+
+            
+            hole_pos_list = self.detect(object=HOLE, target_hole_idx=[0,1,2,3,4,5])
+            # 移动到目标孔粗位置
+            target_hole_pos = hole_pos_list[target_hole_idx]
+            current_waypoint = self.aubo.get_current_waypoint()
+            current_pos = deepcopy(current_waypoint['pos'])
+            current_ori = quaternion_standard2rpy(current_waypoint['ori'])
+            u,v = target_hole_pos[:2]
+            U = np.array([u, v])
+            U0 = np.array(INTRINSIC_U0)
+            A = np.array(INTRINSIC_A)
+            Delta_X = -np.linalg.inv(A).dot(U - U0)/1000
+            new_pos = np.array(current_pos) + np.array([Delta_X[0], Delta_X[1], 0])
+            new_ori = current_ori  # 姿态保持不变
+            self.aubo.movel(new_pos.tolist(), new_ori, joint=False)
             
             # 使用父类的move_and_detect方法移动到目标位置
             target_pos, target_ori = self.move_and_detect(
                 object=HOLE, 
-                target_hole_idx=target_hole_idx
+                target_hole_idx=target_hole_idx,
+                times_limit=2
             )
             
             print(f"检测到目标圆孔位置: {target_pos}, 姿态: {target_ori}")

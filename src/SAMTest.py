@@ -14,6 +14,7 @@ SAM_TYPE = Const.Sam.SAM_MODEL_TYPE
 SAM_WEIGHTS = os.path.join(workspace, Const.Sam.MODEL_DIR, Const.Sam.SAM_WEIGHTS)
 DATASET_DIR = Const.Data.DATASET_DIR
 IMG_DIR = os.path.join(workspace, 'test', 'images')
+# IMG_DIR = os.path.join(workspace, './documents/dataset/1113/images')  # 全部照片
 
 def infer_and_show(predictor, img, win_name="SAM", point_coords=None, point_labels=None):
     """
@@ -330,15 +331,117 @@ def camera_mode(model, cam_id=0):
     cap.close_device()
     cv2.destroyAllWindows()
 
-if __name__ == "__main__":
-    print("请选择模式：")
-    print("1 - 文件夹图片验证 (中心点)")
-    print("2 - 摄像头实时推理 (中心点)")
-    print("3 - 文件夹图片验证 (交互式点击)")
-    print("4 - 摄像头实时推理 (交互式点击)")
-    
-    mode = input("输入1-4并回车: ").strip()
+def generate_prompt(img_shape, seg_class, gear_pos=None, center=False):
+    '''
+    根据类型返回提示点；如果middle为True，返回中心点坐标
+        img_shape: 图像形状
+        seg_class: 'gear', 'hole', 'keyhole'
+        gear_pos: (x, y)齿轮中心位置，仅在center==False且类型为keyhole,hole时使用
+        center: 是否只返回中心点
+    '''
+    h, w = img_shape[:2]
+    if center:
+        return np.array([[w//2, h//2]]), np.array([1])
+    points = []
+    if seg_class == 'gear':
+        # 在两个半径位置生成两圈提示点
+        radius_outer = int(min(h, w) * 0.15)
+        for angle in range(0, 360, 30):
+            rad = np.deg2rad(angle)
+            x_outer = w//2 + int(radius_outer * np.cos(rad))
+            y_outer = h//2 + int(radius_outer * np.sin(rad))
+            points.append([x_outer, y_outer, 1])
+        points = np.array(points)
+        coords = points[:, :2]
+        labels = points[:, 2].astype(int)
+        return coords, labels
+    elif seg_class == 'keyhole':
+        if gear_pos is None:
+            raise ValueError("gear_pos不能为空，当seg_class为'keyhole'时。")
+        gx, gy = gear_pos
+        radius = int(min(h, w) * 0.02)
+        for angle in range(0, 360, 60):
+            rad = np.deg2rad(angle)
+            x = w//2 + int(radius * np.cos(rad))
+            y = h//2 + int(radius * np.sin(rad))
+            points.append([x, y, 1])  # 前景点
+        points = np.array(points)
+        coords = points[:, :2]
+        labels = points[:, 2].astype(int)
+        return coords, labels
+    elif seg_class == 'hole':
+        if gear_pos is None:
+            raise ValueError("gear_pos不能为空，当seg_class为'hole'时。")
+        gx, gy = gear_pos
+        for i in range(6):
+            angle = i * np.pi / 3
+            A_abs_max = np.max(np.abs(np.array(Const.Camera.INTRINSIC_A)))
+            radius = Const.Task.HOLE_DISTANCE[i]*A_abs_max
+            x = int(gx - radius * np.sin(angle))
+            y = int(gy - radius * np.cos(angle))
+            points.append([x, y, 1])  # 前景点
+        points = np.array(points)
 
+        coords = points[:, :2].astype(int)
+        labels = points[:, 2].astype(int)
+        return coords, labels
+
+def infer_and_show_all_class(predictor, img, win_name="SAM"):
+    """
+    SAM推理并可视化函数
+    """
+    # 设置图像到预测器
+    predictor.set_image(img)
+    
+    gear_pos = None
+    for seg_class in ['gear', 'keyhole', 'hole']:
+        point_coords, point_labels = generate_prompt(img.shape, seg_class, gear_pos=gear_pos)
+            
+        print(f"正在分割: {seg_class}")
+        if seg_class != 'hole':
+            result_img, masks, scores = infer_and_show(predictor, img, win_name=f"SAM - {seg_class}", 
+                                                  point_coords=point_coords, point_labels=point_labels)
+        else:
+            for i in range(6):
+                result_img, masks, scores = infer_and_show(predictor, img, win_name=f"SAM - {seg_class}{i+1}", 
+                                                  point_coords=point_coords[i:i+1], point_labels=point_labels[i:i+1])
+
+        
+        if seg_class == 'gear':
+            x1 = np.min(np.where(masks[np.argmax(scores)]==1)[1])
+            x2 = np.max(np.where(masks[np.argmax(scores)]==1)[1])
+            y1 = np.min(np.where(masks[np.argmax(scores)]==1)[0])
+            y2 = np.max(np.where(masks[np.argmax(scores)]==1)[0])
+            gear_pos = ((x1 + x2)//2, (y1 + y2)//2)
+    return result_img
+
+def folder_mode_auto(model):
+    img_files = [f for f in os.listdir(IMG_DIR) if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
+    img_files.sort()
+    for img_name in img_files:
+        img_path = os.path.join(IMG_DIR, img_name)
+        img = cv2.imread(img_path)
+        if img is None:
+            print(f"无法读取图片: {img_path}")
+            continue
+        infer_and_show_all_class(model, img)
+        print(f"当前图片: {img_name}，按 任意键 查看下一张，按 Esc 退出。")
+        key = cv2.waitKey(0)
+        if key == 27:  # Esc
+            break
+    cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    # print("请选择模式：")
+    # print("1 - 文件夹图片验证 (中心点)")
+    # print("2 - 摄像头实时推理 (中心点)")
+    # print("3 - 文件夹图片验证 (交互式点击)")
+    # print("4 - 摄像头实时推理 (交互式点击)")
+    # print("5 - 文件夹图片验证 (自动提示点)")
+    
+    # mode = input("输入1-6并回车: ").strip()
+    mode = "5"
+    
     import torch
     device = "cuda" if torch.cuda.is_available() else "cpu"
     sam = sam_model_registry[SAM_TYPE](checkpoint=SAM_WEIGHTS).to(device=device)
@@ -352,5 +455,7 @@ if __name__ == "__main__":
         folder_mode_interactive(model)
     elif mode == "4":
         camera_mode_interactive(model)
+    elif mode == "5":
+        folder_mode_auto(model)
     else:
         print("无效输入，程序退出。")
