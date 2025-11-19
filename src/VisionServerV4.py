@@ -183,21 +183,20 @@ class VisionServer:
 
             elif client_command.get('command') == 'detect':
                 obj = client_command.get('object')
+                detect_center = client_command.get('detect_center', False)
                 if obj == HOLE:
                     target_hole_idx = client_command.get('target_hole_idx', 0)
                     if isinstance(target_hole_idx, int):
                         idx_list = [target_hole_idx]
-                        classes = 'hole'
                     elif isinstance(target_hole_idx, (list, tuple, np.ndarray)):
                         idx_list = list(target_hole_idx)
-                        classes = 'all'
                     t1 = cv2.getTickCount()
                     hole_list, show_img = self.img_processor.detect_hole(
                         self.img_to_detect,
                         circle_fit_method='EdgeDrawing',
-                        classes=classes
+                        detect_center=detect_center,
                     )
-                    if classes == 'hole':
+                    if detect_center:
                         # 将长度为1的列表补至6
                         hole_list = hole_list * 6
                         

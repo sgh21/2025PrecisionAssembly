@@ -201,7 +201,7 @@ class RobotClient:
             self.send_command({'command': 'capture'})
             result = self.receive_data()
             print(f"Capture Result: {result}")
-            self.send_command({'command': 'detect','object': object, 'target_hole_idx': target_hole_idx})
+            self.send_command({'command': 'detect','object': object, 'target_hole_idx': target_hole_idx, 'detect_center': True if object==HOLE else False})
             result = self.receive_data()
             if not isinstance(result, dict) or result.get('status') != 'success':
                 if isinstance(result, dict):
@@ -314,9 +314,9 @@ class RobotClient:
         pre_pos_xy = target_insert_pos[:2] + direction * step
         pre_pos = np.array([pre_pos_xy[0], pre_pos_xy[1], target_insert_pos[2] + dz])
 
-        # 啮合点（靠近孔口但不进入，距离 step/2）
+        # 啮合点（靠近孔口但不进入，距离 step*ratio）
         engage_pos_xy = target_insert_pos[:2]
-        engage_pos = np.array([engage_pos_xy[0], engage_pos_xy[1], target_insert_pos[2] + dz / 4.0])
+        engage_pos = np.array([engage_pos_xy[0], engage_pos_xy[1], target_insert_pos[2] + dz *Const.Robot.INSERT_DZ_RATIO])
 
         # 插入点（竖直向下到孔口）
         insert_pos = deepcopy(target_insert_pos)
@@ -438,7 +438,7 @@ def main():
     for target_hole_idx in TARGET_HOLE_IDX_LIST:
         if hole_cnt > 0:
             print("等待3秒，请手动旋转齿轮到初始位置...")
-            time.sleep(3)   # 等待手动旋转齿轮
+            time.sleep(Const.Task.TIME_WAIT)   # 等待手动旋转齿轮
         print(f"开始处理目标圆孔索引: {target_hole_idx}")
         gear_flag = gear_flag_str == 'y'
         gear_pos, gear_angle = robot_client.reset_and_insert_hole(

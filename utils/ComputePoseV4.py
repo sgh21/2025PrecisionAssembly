@@ -310,9 +310,9 @@ class LocateHole:
                 seg_list:List[SegmentResult], 
                 show_img: np.ndarray = None,
                 circle_fit_method:str = 'EdgeDrawing',
-                classes='all'):
+                detect_center=False):
 
-        if classes == 'all':
+        if not detect_center:
             hole_seg_list = self.fliter_boxes_by_expected_num(seg_list, expected_num=6)
             if len(hole_seg_list) == 0:
                 print("\033[33mWARNING: No hole detected.\033[0m")
@@ -342,7 +342,7 @@ class LocateHole:
                     sorted_hole_seg_list.append(None)  # -1表示缺失点
                 else:
                     sorted_hole_seg_list.append(hole_seg_list[i])
-        if classes == 'hole':
+        else:
             sorted_hole_seg_list = self.fliter_boxes_by_class(seg_list, HOLE_CLASS)
 
         hole_list = []
@@ -1051,17 +1051,26 @@ class ImageProcessor:
     
     def detect_hole(self, 
                     img: np.ndarray, 
-                    classes = 'all',
+                    detect_center=False,
                     circle_fit_method: str = 'EdgeDrawing') -> List[Tuple[int, int, float]]:
         show_img = deepcopy(img) 
         
         t1 = cv2.getTickCount()
-        seg_list, mark_points = self.yolo_sam_predict(img, classes=classes)
+        
+        if detect_center:
+            box_h, box_w = int(img.shape[0]*Const.Vision.CENTER_BOX_RATIO), int(img.shape[1]*Const.Vision.CENTER_BOX_RATIO)
+            box_x, box_y = (img.shape[1]//2, img.shape[0]//2)
+            seg_list = [SegmentResult(
+                img=img, class_id=HOLE_CLASS, 
+                box=np.array([box_x - box_w//2, box_y - box_h//2, box_x + box_w//2, box_y + box_h//2]),
+                mask=np.ones((box_h, box_w), dtype=bool))]
+        else:
+            seg_list, mark_points = self.yolo_sam_predict(img, classes='all')
 
         t2 = cv2.getTickCount()
         assert len(seg_list) > 0, "No valid segment results found"
         # 处理孔洞检测
-        hole_list, show_img = self.hole_locator.locate_hole(seg_list=seg_list, show_img=show_img, classes=classes, circle_fit_method=circle_fit_method) if self.hole_locator else []
+        hole_list, show_img = self.hole_locator.locate_hole(seg_list=seg_list, show_img=show_img, detect_center=detect_center, circle_fit_method=circle_fit_method) if self.hole_locator else []
 
         if self.show and show_img is not None:
             self._show_img(show_img, waitkey=self.waitkey)

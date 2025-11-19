@@ -100,7 +100,7 @@ class HoleInsertClient(RobotClient):
             final_ori = quaternion_standard2rpy(self.aubo.get_current_waypoint()['ori'])
             
             print(f"移动到最终插入位置: {final_pos}")
-            self.aubo.movel(final_pos, final_ori, joint=True)
+            self.aubo.movel(final_pos, final_ori, joint=False)
             time.sleep(TIME_SLEEP)
             
             print(f"已成功移动到目标圆孔位置 (索引: {target_hole_idx})")

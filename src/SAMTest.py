@@ -359,7 +359,7 @@ def generate_prompt(img_shape, seg_class, gear_pos=None, center=False):
         if gear_pos is None:
             raise ValueError("gear_pos不能为空，当seg_class为'keyhole'时。")
         gx, gy = gear_pos
-        radius = int(min(h, w) * 0.02)
+        radius = int(min(h, w) * 0.04)
         for angle in range(0, 360, 60):
             rad = np.deg2rad(angle)
             x = w//2 + int(radius * np.cos(rad))

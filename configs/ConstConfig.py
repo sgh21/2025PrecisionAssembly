@@ -16,14 +16,14 @@ class Const:
         # CALIB_POS = [0.48885, -0.079199, 0.236420]  # 校准位置 [x, y, z] 单位: m
         # CALIB_ORI = [PI, 0, PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
 
-        INIT_POS = [-0.3762, -0.0436, 0.2372]  # 初始位置 [x, y, z] 单位: m
+        INIT_POS = [-0.3762, -0.0436, 0.2387]  # 初始位置 [x, y, z] 单位: m
         INIT_ORI = [PI, 0, -PI/2]  # 初始姿态 [roll, pitch, yaw] 单位: rad
-        CALIB_POS = [-0.3709, 0.0444, 0.2372]
+        CALIB_POS = [-0.3709, 0.0444, 0.2387]
         CALIB_ORI = [PI, 0, -PI/2]  # 校准姿态 [roll, pitch, yaw] 单位: rad
         
         # HAND_IN_EYE_OFFSET = [-0.114547, -0.00155595, -0.20] # 手眼标定位置 [x, y, z] 单位: m
 
-        MAX_SPEED = 0.5 
+        MAX_SPEED = 0.6
         JOINT_MAX_ACC = [MAX_SPEED] * 6
         JOINT_MAX_VELC = [MAX_SPEED] * 6
         END_MAX_ACC = MAX_SPEED
@@ -33,25 +33,25 @@ class Const:
         JOINT_STABLE_VELC = [STABLE_SPEED] * 6
         END_STABLE_ACC = STABLE_SPEED
         END_STABLE_VELC = STABLE_SPEED
-        INSERT_SPEED = 0.03
+        INSERT_SPEED = 0.005
         JOINT_INSERT_ACC = [INSERT_SPEED] * 6  # 插入时的关节最大加速度
         JOINT_INSERT_VELC = [INSERT_SPEED] * 6
         END_INSERT_ACC = INSERT_SPEED  # 插入时的末端最大加速度
         END_INSERT_VELC = INSERT_SPEED
-        SPIN_SPEED = 2.0
+        SPIN_SPEED = 3.0
         JOINT_SPIN_ACC = [SPIN_SPEED] * 6
         JOINT_SPIN_VELC = [SPIN_SPEED] * 6
         END_SPIN_ACC = SPIN_SPEED
         END_SPIN_VELC = SPIN_SPEED
         POSE_ERROR_THRESHOLD = 5 * 1e-5  # 位置误差阈值（米） 0.05mm
 
-        USE_SEPARATE_HAND_IN_EYE_OFFSET = True # 每个孔使用各自的手眼标定结果
+        USE_SEPARATE_HAND_IN_EYE_OFFSET = False # 每个孔使用各自的手眼标定结果
         # 比赛
         # X_OFFSET = -0.11  # 相机X轴偏移量（米） -2.0147132317361707
         # HAND_IN_EYE_OFFSET = [0.10967375, 0.00199195, -0.155]
         # 实验室
         X_OFFSET = 0.11  # 相机X轴偏移量（米） -2.0147132317361707
-        HAND_IN_EYE_OFFSET = [-0.113415, 0.000252, -0.150]
+        HAND_IN_EYE_OFFSET = [-0.113750, 0.000197, -0.150]
         HAND_IN_EYE_OFFSET_LIST = [
             [-0.113415, 0.000252, -0.150],
             [-0.113415, 0.000252, -0.150],
@@ -62,10 +62,11 @@ class Const:
         ]
 
         SEPARATE_CONTROLLER_INIT_ANGLE = False  # 是否分别使用不同的控制器初始角度
-        CONTROLLER_INIT_ANGLE = -0.94 / 180 * PI
+        CONTROLLER_INIT_ANGLE = 1.8 / 180 * PI
         CONTROLLER_INIT_ANGLE_LIST=[-5.71/180*PI, -1.21/180*PI, 3.29/180*PI, 0, 0, 0]
-        STEP = 0.003
-        DZ = 0.04
+        STEP = 0.002            # 侧向偏移
+        INSERT_DZ_RATIO = 0.18  # 切换至插入模式的dz比例
+        DZ = 0.04               # 插入深度
 
         
     class Task:
@@ -75,8 +76,9 @@ class Const:
         # TARGET_HOLE_IDX_LIST = [ 0, 1, 2, 3, 4, 5]
         # TARGET_HOLE_IDX_LIST = [2]*6
         TIME_SLEEP = 0.8  # 等待机械臂稳定的时间
-        WAITKEY = 30  # OpenCV窗口等待时间
-        ROTATION_ANGLE = 50/180*PI  # 每次旋转角度，单位：rad
+        TIME_WAIT = 2.5  # 等待裁判旋转齿轮的时间
+        WAITKEY = 10  # OpenCV窗口等待时间
+        ROTATION_ANGLE = -45/180*PI  # 每次旋转角度，单位：rad
         HOLE_DISTANCE = [61, 59, 57, 56, 55, 54]
 
     class Camera:
@@ -85,8 +87,8 @@ class Const:
         # INTRINSIC_A = [[-0.2816, 14.0124],  # 0.4191 px 0.4256 px
         #                [13.9848,  0.3358]]
         # 实验室
-        INTRINSIC_A = [[-0.1842, -14.3617],  # 0.4191 px 0.4256 px
-                       [-14.3878,  0.2278]]
+        INTRINSIC_A = [[-0.1526, -14.2688],  # 0.4191 px 0.4256 px
+                       [-14.2081,  0.2359]]
 
         INTRINSIC_U0 = [1536, 1024]
         
@@ -113,13 +115,14 @@ class Const:
 
         N_SLICE_ITERS = 2  # 切片迭代次数
 
-        MIN_HOLE_RADIUS = 90
-        MAX_HOLE_RADIUS = 160
-
         # USE_RADIUS_SPLIT_CALIB_HOLE = True  # 使用半径区分标定圆和hole
         USE_RADIUS_SPLIT_CALIB_HOLE = False 
         RADIUS_THRESHOLD = HOLE_RADIUS-1  # 半径阈值，单位：px
         USE_CALIB_LIST = False  # 保留九个标定圆进行位姿计算(不稳定)
+
+        MIN_HOLE_RADIUS = 90
+        MAX_HOLE_RADIUS = 160
+        CENTER_BOX_RATIO = 0.2  # 中心区域边界框占比
 
     class Gear:
         Z = 18
@@ -133,8 +136,8 @@ class Const:
         MODEL_DIR = r'./models'
         # YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0819.pt'
         # YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0910.pt'
-        YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0914-200.pt'
-        YOLO_HOLE_WEIGHTS = 'yolov11s-seg-1105.pt'
+        # YOLO_HOLE_WEIGHTS = 'yolov11s-seg-0914-200.pt'
+        YOLO_HOLE_WEIGHTS = 'yolov11s-seg-1113-2.pt'
         YOLO_CONF = 0.7  # YOLO检测置信度阈值
     
     class Sam:

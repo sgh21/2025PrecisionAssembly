@@ -186,6 +186,7 @@ class VisionServer:
                 obj = client_command.get('object')
                 if obj == HOLE:
                     target_hole_idx = client_command.get('target_hole_idx', 0)
+                    detect_center = client_command.get('detect_center', False)
                     if isinstance(target_hole_idx, int):
                         idx_list = [target_hole_idx]
                     elif isinstance(target_hole_idx, (list, tuple, np.ndarray)):
@@ -193,8 +194,11 @@ class VisionServer:
                     t1 = cv2.getTickCount()
                     hole_list, show_img = self.img_processor.detect_hole(
                         self.img_to_detect,
+                        detect_center=detect_center,
                         circle_fit_method='EdgeDrawing',
                     )
+                    if detect_center:
+                        hole_list = hole_list * 6
                     if show_img is not None:
                         self.send_to_display(show_img)
                     
@@ -370,6 +374,8 @@ def main():
             vision_server.handle_client(client_socket)
         except Exception as e:
             print(f"处理客户端时发生异常: {e}")
+            import traceback
+            traceback.print_exc()
         finally:
             client_socket.close()
             print(f"与 {addr} 的连接已关闭。")

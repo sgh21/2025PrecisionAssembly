@@ -14,6 +14,10 @@ from configs.ConstConfig import Const, SegmentResult
 MIN_HOLE_RADIUS = Const.Vision.MIN_HOLE_RADIUS
 MAX_HOLE_RADIUS = Const.Vision.MAX_HOLE_RADIUS
 
+GEAR_CLASS = Const.ClassInfo.GEAR_CLASS
+KEYHOLE_CLASS = Const.ClassInfo.KEYHOLE_CLASS
+HOLE_CLASS = Const.ClassInfo.HOLE_CLASS
+CALIB_CLASS = Const.ClassInfo.CALIB_CLASS
 # * : begin define utility functions
 
 def fit_circle(points):
@@ -301,38 +305,42 @@ class LocateHole:
     def locate_hole(self,
                 seg_list:List[SegmentResult], 
                 show_img: np.ndarray = None,
+                detect_center=False,
                 circle_fit_method:str = 'EdgeDrawing'):
-        hole_seg_list = self.fliter_boxes_by_expected_num(seg_list, expected_num=6)
-        if len(hole_seg_list) == 0:
-            print("\033[33mWARNING: No hole detected.\033[0m")
-            return None
-        
-        # 过滤半径超限的圆，并构造seg_list的中心点列表和对应的索引
-        centers = []
-        indices = []
-        for i, seg in enumerate(hole_seg_list):
-            # 计算中心点
-            x1, y1, x2, y2 = seg.xyxy_i
-            cx = (x1 + x2) / 2
-            cy = (y1 + y2) / 2
-            centers.append((cx, cy))
-            indices.append(i)
-        
-        if len(centers) < 6 :
-            centers, indices = self.complete_hexagon(centers, indices)
-
-        # 对六边形分布的圆孔进行排序
-        sorted_centers, sorted_indices = self.sort_hexagon_centers(centers, indices)
-
-        # 根据sorted_indices重新排序hole_seg_list
-        sorted_hole_seg_list = []
-        for i in sorted_indices:
-            if i < 0:
-                sorted_hole_seg_list.append(None)  # -1表示缺失点
-            else:
-                sorted_hole_seg_list.append(hole_seg_list[i])
-        
         hole_list = []
+        if not detect_center:
+            hole_seg_list = self.fliter_boxes_by_expected_num(seg_list, expected_num=6)
+            if len(hole_seg_list) == 0:
+                print("\033[33mWARNING: No hole detected.\033[0m")
+                return None
+            
+            # 过滤半径超限的圆，并构造seg_list的中心点列表和对应的索引
+            centers = []
+            indices = []
+            for i, seg in enumerate(hole_seg_list):
+                # 计算中心点
+                x1, y1, x2, y2 = seg.xyxy_i
+                cx = (x1 + x2) / 2
+                cy = (y1 + y2) / 2
+                centers.append((cx, cy))
+                indices.append(i)
+            
+            if len(centers) < 6 :
+                centers, indices = self.complete_hexagon(centers, indices)
+
+            # 对六边形分布的圆孔进行排序
+            sorted_centers, sorted_indices = self.sort_hexagon_centers(centers, indices)
+
+            # 根据sorted_indices重新排序hole_seg_list
+            sorted_hole_seg_list = []
+            for i in sorted_indices:
+                if i < 0:
+                    sorted_hole_seg_list.append(None)  # -1表示缺失点
+                else:
+                    sorted_hole_seg_list.append(hole_seg_list[i])
+        else:
+            sorted_hole_seg_list = self.fliter_boxes_by_class(seg_list, target_cls = HOLE_CLASS)
+            
         for i, seg in enumerate(sorted_hole_seg_list):
             if seg is None:
                 hole_list.append((sorted_centers[i][0], sorted_centers[i][1], None))  # 缺失点
@@ -363,63 +371,6 @@ class LocateHole:
                 cv2.putText(show_img, str(i), (int(cx), int(cy)), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 0, 255), 2)
         
         return hole_list, show_img
-    
-
-    def locate_calib_circle_list(self,
-                            seg_list:List[SegmentResult],
-                            show_img: np.ndarray = None,
-                            circle_fit_method:str = 'EdgeDrawing'):
-        calib_seg_list = self.fliter_boxes_by_class(seg_list, target_cls=Const.ClassInfo.CALIB_CLASS)
-        pos_list = [((seg.xyxy_i[0] + seg.xyxy_i[2]) / 2, (seg.xyxy_i[1] + seg.xyxy_i[3]) / 2, (seg.xyxy_i[2]-seg.xyxy_i[0]+seg.xyxy_i[3]-seg.xyxy_i[1]) / 4) for seg in calib_seg_list]
-        x, y = [p[0] for p in pos_list], [p[1] for p in pos_list]
-        middle_pos = [np.median(x), np.median(y)]
-        distance = np.mean([np.max(x)-np.min(x), np.max(y)-np.min(y)]) / 2
-        ideal_pos = np.array([
-            [middle_pos[0] - distance, middle_pos[1] - distance],
-            [middle_pos[0], middle_pos[1] - distance],
-            [middle_pos[0] + distance, middle_pos[1] - distance],
-            [middle_pos[0] - distance, middle_pos[1]],
-            [middle_pos[0], middle_pos[1]],
-            [middle_pos[0] + distance, middle_pos[1]],
-            [middle_pos[0] - distance, middle_pos[1] + distance],
-            [middle_pos[0], middle_pos[1] + distance],
-            [middle_pos[0] + distance, middle_pos[1] + distance],
-        ], dtype=int)
-        result = pos_list.copy()
-
-        # result = np.ones((9,3)).tolist()        
-        # for calib_seg in calib_seg_list:
-        #     limg = calib_seg.local_img_i
-            
-        #     gray_img = cv2.cvtColor(limg, cv2.COLOR_BGR2GRAY) if len(limg.shape) == 3 else limg
-        #     # 使用指定的圆拟合方法
-        #     circles = None
-        #     if circle_fit_method == 'EdgeDrawing':
-        #         circles = EdgeDrawingMethod(gray_img, return_all=True)
-        #     if circles is None or len(circles) == 0:
-        #         # 使用其它方法或者检测失败时，使用HoughCircles
-        #         circles = HoughCircleMethod(gray_img, return_all=True)
-        #     # TODO: 测试并检查代码逻辑
-        #     if circles is None or len(circles) == 0:
-        #         print("\033[33mWARNING: Circle fitting failed, using bounding box center and radius.\033[0m")
-        #         x1, y1, x2, y2 = calib_seg.xyxy_i
-        #         # 如果圆拟合失败，使用边界框中心和半径
-        #         cx = (x1 + x2) / 2
-        #         cy = (y1 + y2) / 2
-        #         r = max(x2 - x1, y2 - y1) / 2
-        #         circle = (cx, cy, r)
-        #     else:
-        #         circle = self.filter_hole_by_radius(calib_seg.xyxy_i, circles, radius=Const.Vision.HOLE_RADIUS)
-        #     nearest_idx = np.argmin([(circle[0]-ip[0])**2+(circle[1]-ip[1])**2 for ip in ideal_pos])
-        #     result[nearest_idx] = circle
-
-        if show_img is not None:
-            for circle in result:
-                if circle[0] is not None and circle[1] is not None:
-                    cv2.circle(show_img, (int(circle[0]), int(circle[1])), int(circle[2]), (0, 0, 255), 2)
-                    cv2.putText(show_img, "Calib Hole", (int(circle[0]), int(circle[1])), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0, 255, 0), 2)
-            
-        return result
 
 
 
@@ -982,16 +933,25 @@ class ImageProcessor:
     
     def detect_hole(self, 
                     img: np.ndarray, 
+                    detect_center=False,   # 是否只检测位于中心的一个孔
                     circle_fit_method: str = 'EdgeDrawing') -> List[Tuple[int, int, float]]:
         show_img = deepcopy(img) 
         
         t1 = cv2.getTickCount()
-        seg_list = self.yolo_predict(img)
+        if detect_center:
+            box_h, box_w = int(img.shape[0]*Const.Vision.CENTER_BOX_RATIO), int(img.shape[1]*Const.Vision.CENTER_BOX_RATIO)
+            box_x, box_y = (img.shape[1]//2, img.shape[0]//2)
+            seg_list = [SegmentResult(
+                img=img, class_id=HOLE_CLASS, 
+                box=np.array([box_x - box_w//2, box_y - box_h//2, box_x + box_w//2, box_y + box_h//2]),
+                mask=np.ones((box_h, box_w), dtype=bool))]
+        else:
+            seg_list = self.yolo_predict(img)
 
         t2 = cv2.getTickCount()
         assert len(seg_list) > 0, "No valid segment results found"
         # 处理孔洞检测
-        hole_list, show_img = self.hole_locator.locate_hole(seg_list=seg_list, show_img=show_img, circle_fit_method=circle_fit_method) if self.hole_locator else []
+        hole_list, show_img = self.hole_locator.locate_hole(seg_list=seg_list, show_img=show_img, detect_center=detect_center, circle_fit_method=circle_fit_method) if self.hole_locator else []
 
         if self.show and show_img is not None:
             self._show_img(show_img, waitkey=self.waitkey)
